@@ -33,33 +33,85 @@
   <button class="pill" data-calc-zone="two" aria-pressed="false">상층 2구역</button>
   <button class="pill" data-calc-zone="strike" aria-pressed="false">일격 점수</button>
 </div>
-<section id="zoneOnePanel" aria-label="상층 1구역 계산">
-<div class="card zone-intro"><h2>상층 1구역 · 기여도 계산</h2><p class="note">몬스터 최대 HP에 대한 개인별 기여율을 입력하세요. 외부 참가자가 있으므로 길드 합계가 100%보다 작아도 정상입니다.</p>
-<div id="monsterChoices" class="monster-choices" role="group" aria-label="1구역 몬스터"></div>
-<div class="grid"><div class="field"><label for="zoneOneHp">몬스터 최대 체력 (HP)</label><input id="zoneOneHp" type="number" value="0" min="0" step="1" inputmode="numeric" placeholder="최대 HP 입력"></div>
-<div class="field"><label for="zoneOneInputMode">입력한 기여도 기준</label><select id="zoneOneInputMode"><option value="final">게임에 표시된 최종 %</option><option value="raw">보정 전 기본 %</option></select></div>
-<div class="field"><label for="zoneOneSpeed">배속</label><select id="zoneOneSpeed"><option value="1">1배속</option><option value="2">2배속 (4.29% 손실)</option></select></div>
-<div class="field"><label for="zoneOneServerBonus">서버 격추 보너스 (%)</label><input id="zoneOneServerBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"></div>
-<div class="field"><label for="zoneOneKnockLoss">격추 1회당 점수 손실 (%)</label><input id="zoneOneKnockLoss" type="number" value="0" min="0" max="100" step="0.01" inputmode="decimal"></div></div>
-<p class="hint">길드원별 상층 1구역 추가 격추는 기본 격추에 더해집니다. 상층 2구역 추가 격추는 적용되지 않습니다.</p>
-<p class="hint">최종 %를 입력했다면 손실·격추 보너스를 중복 적용하지 않습니다. 보정 전 %를 입력할 때만 설정한 보너스·배속·격추 손실을 반영합니다. 격추 1회당 손실률은 실제 게임값으로 직접 설정하세요.</p>
-</div>
-<div class="card"><div class="section-heading"><h2>길드원 참여 기여도</h2><button class="secondary small" data-open-tab="members">군 편성</button></div>
-<div id="zoneOneMembers"></div><div id="zoneOneTotals" class="result-block" aria-live="polite"></div></div>
-<div class="card"><h2>군별 1차 할당</h2><div class="group-quota-grid"><div><strong>1군</strong><b>30%</b></div><div><strong>2군</strong><b>25%</b></div><div><strong>3군</strong><b>25%</b></div><div><strong>4군</strong><b>20%</b></div></div>
-<p class="hint">획득한 보상 총 수량을 군별로 30·25·25·20%에 가깝게 정수 할당합니다. 보상 종류마다 가치가 다르면 실제 군별 총가치는 달라질 수 있습니다.</p></div>
-<div class="card"><h2>획득 보상 입력</h2><div class="reward-input-grid"><div class="field"><label for="newRewardName">보상 이름</label><input type="text" id="newRewardName" maxlength="40" placeholder="보상 이름"></div>
-<div class="field"><label for="newRewardQuantity">획득 수량</label><input type="number" id="newRewardQuantity" min="1" max="2000" step="1" value="1"></div>
-<div class="field"><label for="newRewardValue">개당 가치 (상대값)</label><input type="number" id="newRewardValue" min="0.01" step="0.01" value="1"></div></div>
-<div class="actions"><button id="addReward" class="secondary">보상 추가</button></div><div id="rewardList"></div>
-<p class="hint">보상 가치는 직접 설정합니다. 가치가 큰 보상일수록 2차 추첨에서 높은 기여도를 더 크게 반영합니다.</p>
-<button id="drawZoneOne" class="primary full-width">군별 분배 및 2차 추첨 실행</button>
-<div id="zoneOneResults" aria-live="polite"></div></div>
+<section id="zoneOnePanel" class="z1-screen" aria-label="상층 1구역 계산">
+  <section class="z1-hero" aria-label="상층 1구역 안내">
+    <div class="z1-hero-copy">
+      <span class="z1-eyebrow">TOWER · STAGE 01</span>
+      <h2>상층 1구역</h2>
+      <p>기여도를 기록하고 군별로 보상을 배분해 보세요.</p>
+      <div class="z1-hero-tags"><span id="z1HeroMonster">격전쥐</span><span id="z1HeroSpeed">1배속</span></div>
+    </div>
+    <img class="z1-hero-mascot" src="assets/wheel-hamster.png" alt="" loading="lazy">
+    <span class="z1-spark z1-spark-a" aria-hidden="true">✦</span>
+    <span class="z1-spark z1-spark-b" aria-hidden="true">✧</span>
+  </section>
+
+  <section class="card z1-card" aria-labelledby="z1MonsterHeading">
+    <div class="z1-section-heading"><span class="z1-step">01</span><div><h2 id="z1MonsterHeading">공략 몬스터</h2><p>기여도를 계산할 몬스터를 선택하세요.</p></div></div>
+    <div id="monsterChoices" class="z1-monster-grid" role="group" aria-label="1구역 몬스터 선택"></div>
+    <div class="z1-hp-field"><div class="field"><label for="zoneOneHp">몬스터 최대 체력 (HP)</label><input id="zoneOneHp" type="number" value="0" min="0" step="1" inputmode="numeric" placeholder="최대 HP 입력"></div><small>몬스터별로 따로 기억돼요.</small></div>
+  </section>
+
+  <section class="card z1-card" aria-labelledby="z1ConditionsHeading">
+    <div class="z1-section-heading"><span class="z1-step">02</span><div><h2 id="z1ConditionsHeading">전투 조건</h2><p>격추 보너스와 배속 손실을 적용해요.</p></div></div>
+    <div class="z1-conditions-grid">
+      <div class="field z1-wide"><label for="zoneOneInputMode">기여도 입력 기준</label>
+        <select id="zoneOneInputMode"><option value="final">게임에 표시된 최종 %</option><option value="raw">보정 전 기본 %</option></select>
+      </div>
+      <div class="field z1-wide"><label id="z1SpeedLabel">전투 배속</label>
+        <div class="z1-speed-buttons" role="group" aria-labelledby="z1SpeedLabel">
+          <button type="button" class="z1-speed-choice active" data-z1-speed="1" aria-pressed="true"><strong>×1</strong><small>기본 배속</small></button>
+          <button type="button" class="z1-speed-choice" data-z1-speed="2" aria-pressed="false"><strong>×2</strong><small>점수 −4.29%</small></button>
+        </div>
+        <select id="zoneOneSpeed" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="1">1배속</option><option value="2">2배속 (4.29% 손실)</option></select>
+      </div>
+      <div class="field"><label for="zoneOneServerBonus">서버 격추 보너스 (%)</label><div class="z1-input-suffix"><input id="zoneOneServerBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"><span>%</span></div></div>
+      <div class="field"><label for="zoneOneKnockLoss">격추 1회당 점수 손실 (%)</label><div class="z1-input-suffix"><input id="zoneOneKnockLoss" type="number" value="0" min="0" max="100" step="0.01" inputmode="decimal"><span>%</span></div></div>
+    </div>
+    <div class="z1-condition-note" id="z1ModeNote" role="note">표시된 최종 기여율을 입력하면 보너스와 손실을 다시 적용하지 않습니다.</div>
+    <p class="z1-muted-note">개인 격추는 기본 격추 + 상층 1구역 추가 격추로 계산합니다. 손실률은 입력한 값으로 적용됩니다.</p>
+  </section>
+
+  <section class="card z1-card" aria-labelledby="z1RosterHeading">
+    <div class="z1-section-heading"><span class="z1-step">03</span><div><h2 id="z1RosterHeading">길드원 참여 기여도 <span id="z1MemberCount" class="z1-count">0명</span></h2><p>길드원별 기여율을 입력하세요. 합계가 100% 미만이어도 괜찮아요.</p></div><button type="button" class="secondary small z1-manage" data-open-tab="members">군 편성</button></div>
+    <div class="z1-filter-row" role="group" aria-label="군별 길드원 표시">
+      <button type="button" class="z1-filter active" data-z1-filter="all" aria-pressed="true">전체</button>
+      <button type="button" class="z1-filter" data-z1-filter="1" aria-pressed="false">1군</button>
+      <button type="button" class="z1-filter" data-z1-filter="2" aria-pressed="false">2군</button>
+      <button type="button" class="z1-filter" data-z1-filter="3" aria-pressed="false">3군</button>
+      <button type="button" class="z1-filter" data-z1-filter="4" aria-pressed="false">4군</button>
+      <button type="button" class="z1-filter" data-z1-filter="0" aria-pressed="false">미지정</button>
+    </div>
+    <div class="z1-roster-tools">
+      <label class="z1-search"><span aria-hidden="true">⌕</span><input id="z1MemberSearch" type="search" placeholder="길드원 검색" aria-label="길드원 이름 검색" autocomplete="off"></label>
+      <button type="button" id="z1FilledOnly" class="secondary small" aria-pressed="false">입력된 인원만</button>
+      <button type="button" id="z1ResetVisible" class="secondary small">표시 인원 초기화</button>
+    </div>
+    <div id="zoneOneMembers" class="z1-member-list"></div>
+    <div id="zoneOneTotals" class="z1-totals" aria-live="polite"></div>
+  </section>
+
+  <section class="card z1-card" aria-labelledby="z1RewardsHeading">
+    <div class="z1-section-heading"><span class="z1-step">04</span><div><h2 id="z1RewardsHeading">군별 보상 할당</h2><p>보상 수량을 기준으로 4개 군에 자동 분배해요.</p></div></div>
+    <div class="z1-quota-grid group-quota-grid" aria-label="군별 할당 비율"><div class="z1-quota z1-q1"><strong>1군</strong><b>30%</b></div><div class="z1-quota z1-q2"><strong>2군</strong><b>25%</b></div><div class="z1-quota z1-q3"><strong>3군</strong><b>25%</b></div><div class="z1-quota z1-q4"><strong>4군</strong><b>20%</b></div></div>
+    <p class="z1-muted-note">보상 개수를 먼저 할당하고, 군 안에서 기여도와 아이템 가치를 반영해 2차 추첨합니다. 참여자가 없는 군의 보상은 보류됩니다.</p>
+  </section>
+
+  <section class="card z1-card" aria-labelledby="z1ItemsHeading">
+    <div class="z1-section-heading"><span class="z1-step">05</span><div><h2 id="z1ItemsHeading">획득 보상 입력</h2><p>획득한 아이템의 수량과 가치를 등록하세요.</p></div></div>
+    <div class="reward-input-grid z1-reward-input"><div class="field"><label for="newRewardName">보상 이름</label><input type="text" id="newRewardName" maxlength="40" placeholder="보상 이름"></div>
+    <div class="field"><label for="newRewardQuantity">수량</label><input type="number" id="newRewardQuantity" min="1" max="2000" step="1" value="1" inputmode="numeric"></div>
+    <div class="field"><label for="newRewardValue">개당 가치 (상대값)</label><input type="number" id="newRewardValue" min="0.01" step="0.01" value="1" inputmode="decimal"></div></div>
+    <button id="addReward" class="secondary z1-add-reward" type="button">+ 보상 추가</button>
+    <div id="rewardList" class="z1-reward-list"></div>
+    <button id="drawZoneOne" class="primary z1-draw-button" type="button">✦ 군별 분배 및 2차 추첨</button>
+    <div id="zoneOneResults" aria-live="polite"></div>
+  </section>
 </section>
 <div id="zoneTwoPanel" class="z2-screen" hidden>
   <section class="z2-hero" aria-label="상층 2구역 안내">
     <div class="z2-hero-copy">
-      <span class="z2-eyebrow">TOWER · STAGE 02</span>
+      <span class="z2-eyebrow" id="z2HeroEyebrow">TOWER · STAGE 02</span>
       <h2 id="z2HeroTitle">상층 2구역</h2>
       <p id="z2HeroDesc">길드원의 격추값과 전투 시간을 계산해 최적의 공략 분담을 맞춰 보세요.</p>
       <div class="z2-hero-tags"><span id="z2HeroBoss">바나냥</span><span id="z2HeroSpeed">2배속</span></div>

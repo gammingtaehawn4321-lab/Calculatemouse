@@ -368,6 +368,19 @@
     $('bossMode').classList.toggle('active',boss);
     $('strikeMode').classList.toggle('active',!boss);
     $('z2BossPanel').hidden=!boss;
+    // When the boss-selection step is hidden in 일격 mode, renumber the visible steps from 01.
+    $('z2HeroEyebrow').textContent=boss?'TOWER · STAGE 02':'TOWER · NORMAL';
+    $('zoneTwoPanel').classList.toggle('z2-normal-mode',!boss);
+    const visibleSteps=[
+      ['.z2-settings-section',boss?'02':'01'],
+      ['.z2-roster-section',boss?'03':'02'],
+      ['.z2-players-section',boss?'04':'03'],
+      ['.z2-summary',boss?'05':'04']
+    ];
+    visibleSteps.forEach(([selector,number])=>{
+      const label=$('zoneTwoPanel').querySelector(selector+' .z2-step');
+      if(label)label.textContent=number;
+    });
     $('bossControls').hidden=!boss;
     $('regionControls').hidden=boss;
     $('autoActions').hidden=!boss;
@@ -620,7 +633,108 @@
 })();
 
 
-/* Zone 1 UI */
+
+/* Bundled ZoneOneEngine for GitHub Pages upload workflows. */
+/* 상층 1구역 계산 및 2단계 보상 추첨. 독립된 순수 함수. */
+(function(root,factory){
+  const api=factory();
+  if(typeof module==='object'&&module.exports)module.exports=api;
+  if(root)root.ZoneOneEngine=api;
+})(typeof window!=='undefined'?window:undefined, function(){
+  'use strict';
+  const SHARES=Object.freeze({1:30,2:25,3:25,4:20});
+  const MONSTERS=Object.freeze(['격전쥐','유령 꿀벌','유령 꽃게','유령 토끼']);
+  const FINITE=(n,min=0,max=1e9)=>Number.isFinite(Number(n))?Math.max(min,Math.min(max,Number(n))):min;
+  function calculate(entries, options={}){
+    const speed=Number(options.speed)===1?1:2;
+    const mode=options.inputMode==='final'?'final':'raw';
+    const serverBonus=FINITE(options.serverBonus,0,1000000);
+    const lossPerKnock=FINITE(options.lossPerKnock,0,100);
+    const factor=speed===2?0.9571:1;
+    const people=entries.map(m=>{
+      const raw=FINITE(m.raw,0,100);
+      const bonus=FINITE(m.bonus,0,1000000)+FINITE(m.zone1Bonus,0,1000000);
+      const knocks=Math.floor(FINITE(m.knocks,0,100));
+      const adjusted=mode==='final'?raw:raw*(1+(bonus+serverBonus)/100)*factor*Math.pow(1-lossPerKnock/100,knocks);
+      return {id:String(m.id),name:String(m.name),group:Number(m.group)||0,raw,knocks,bonus,effective:adjusted};
+    });
+    const total=people.reduce((s,p)=>s+p.effective,0);
+    return {people,total,remaining:Math.max(0,100-total),overCap:total>100.000001,speed,inputMode:mode};
+  }
+  function groupQuotas(count){
+    if(!Number.isSafeInteger(count)||count<0)throw new Error('보상 수량이 잘못되었습니다.');
+    const result={};let allocated=0;
+    const leftovers=[];
+    for(let g=1;g<=4;g++){
+      const exact=count*SHARES[g]/100;
+      const floored=Math.floor(exact);
+      result[g]=floored;allocated+=floored;
+      leftovers.push({group:g,frac:exact-floored});
+    }
+    leftovers.sort((a,b)=>b.frac-a.frac||a.group-b.group);
+    for(let i=0;i<count-allocated;i++)result[leftovers[i].group]++;
+    return result;
+  }
+  function pickWeighted(options, weight, random){
+    let total=0;const scores=options.map(x=>{let w=Math.max(0,weight(x));total+=w;return w});
+    if(total<=0)return null;
+    const r=Math.min(.999999999999,Math.max(0,random()))*total;
+    let acc=0;
+    for(let i=0;i<options.length;i++){
+      acc+=scores[i];if(r<acc)return options[i];
+    }
+    return options[options.length-1];
+  }
+  // 1차: 보상 *개수*를 30/25/25/20으로 최대 잔여 방식으로 확정.
+  // 2차: 각 보상 단위가 군에 무작위 귀속되고, 해당 군 안에서 기여도/가치를 가중한 추첨.
+  function draw({members,items},rng=Math.random){
+    if(!Array.isArray(members)||!Array.isArray(items))throw new Error('추첨 입력이 올바르지 않습니다.');
+    const safeItems=items.map((item,i)=>({
+      id:String(item.id??i),name:String(item.name||'').trim(),
+      quantity:Number(item.quantity),value:Number(item.value)
+    }));
+    if(safeItems.some(x=>!x.name||!Number.isSafeInteger(x.quantity)||x.quantity<1||x.quantity>2000||!Number.isFinite(x.value)||x.value<=0||x.value>1e9))
+      throw new Error('보상 이름·개수(1~2000)·가치(0 초과)를 확인하세요.');
+    const totalCount=safeItems.reduce((s,x)=>s+x.quantity,0);
+    if(totalCount>2000)throw new Error('한 번에 추첨할 보상은 총 2000개 이하로 입력하세요.');
+    const people=members.filter(m=>Number(m.group)>=1&&Number(m.group)<=4).map(m=>({
+      id:String(m.id),name:String(m.name),group:Number(m.group),effective:FINITE(m.effective,0,100),
+      won:[],wonValue:0,wonCount:0
+    }));
+    const quota=groupQuotas(totalCount);
+    const left={...quota};
+    const groupStats={};for(let g=1;g<=4;g++)groupStats[g]={group:g,quota:quota[g],assigned:0,distributed:0,held:0,value:0};
+    const rewards=[];const held=[];
+    const maxValue=Math.max(1,...safeItems.map(x=>x.value));
+    const units=[];
+    for(const item of safeItems)for(let i=0;i<item.quantity;i++)units.push(item);
+    // Value affects second-stage selection; randomized order prevents input ordering bias.
+    for(let i=units.length-1;i>0;i--){const j=Math.floor(Math.max(0,Math.min(.999999999999,rng()))*(i+1));[units[i],units[j]]=[units[j],units[i]];}
+    const totalValue=units.reduce((s,x)=>s+x.value,0);
+    for(const item of units){
+      const groups=[1,2,3,4].filter(g=>left[g]>0);
+      const group=pickWeighted(groups,g=>left[g],rng);
+      if(group===null)throw new Error('군별 할당 수량 계산 오류');
+      left[group]--;groupStats[group].assigned++;groupStats[group].value+=item.value;
+      const eligible=people.filter(m=>m.group===group&&m.effective>0);
+      if(eligible.length===0){groupStats[group].held++;held.push({group,item:item.name,value:item.value});continue;}
+      const rarity=item.value/maxValue;
+      const power=0.7+1.1*rarity;
+      const median=totalValue/Math.max(totalCount,1);
+      const selected=pickWeighted(eligible,m=>Math.pow(m.effective,power)/(1+m.wonValue/Math.max(1,median*3)),rng);
+      if(!selected){groupStats[group].held++;held.push({group,item:item.name,value:item.value});continue;}
+      selected.won.push({name:item.name,value:item.value});selected.wonCount++;selected.wonValue+=item.value;
+      groupStats[group].distributed++;
+      rewards.push({group,memberId:selected.id,memberName:selected.name,item:item.name,value:item.value});
+    }
+    const actualValue=Object.values(groupStats).reduce((s,g)=>s+g.value,0);
+    return {quota,groupStats,people,totalCount,totalValue,actualValue,rewards,held};
+  }
+  return {SHARES,MONSTERS,calculate,groupQuotas,draw};
+});
+
+
+/* Zone 1 — guild contribution dashboard. All calculations remain in ZoneOneEngine. */
 'use strict';
 (()=>{
   const Engine=window.ZoneOneEngine;
@@ -630,92 +744,145 @@
   const pct=n=>`${Number(n).toFixed(2)}%`;
   const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const asNumber=(v,max=1e9)=>Number.isFinite(Number(v))?Math.max(0,Math.min(max,Number(v))):0;
+  const MONSTER_ICONS=['🐭','🐝','🦀','🐇'];
   const makeStore=()=>({monster:Engine.MONSTERS[0],monsters:{},options:{inputMode:'final',speed:1,serverBonus:0,lossPerKnock:0},rewards:[],lastDraw:null});
   let data;
   try {
     data=JSON.parse(localStorage.getItem(STORE));
-    if(!data||typeof data!=='object'||!data.monsters||!Array.isArray(data.rewards))throw Error('bad');
-  }catch {data=makeStore();}
+    if(!data||typeof data!=='object'||!data.monsters||typeof data.monsters!=='object'||!Array.isArray(data.rewards))throw Error('bad');
+  }catch{data=makeStore();}
   if(!Engine.MONSTERS.includes(data.monster))data.monster=Engine.MONSTERS[0];
-  data.options=data.options||makeStore().options;
+  data.options={...makeStore().options,...(data.options||{})};
   if(!['raw','final'].includes(data.options.inputMode))data.options.inputMode='final';
   data.rewards=data.rewards.filter(x=>x&&typeof x.name==='string'&&Number.isSafeInteger(x.quantity)&&x.quantity>=1&&Number(x.value)>0);
-  const save=()=>{try{localStorage.setItem(STORE,JSON.stringify(data));}catch{message('저장 공간이 부족해 기여도를 보존하지 못했습니다.');}};
+  let groupFilter='all', memberSearch='',filledOnly=false;
   let cooldown;
   function message(text){
     const toast=$('toast');if(!toast)return;
     toast.textContent=text;toast.hidden=false;clearTimeout(cooldown);cooldown=setTimeout(()=>toast.hidden=true,3500);
   }
+  function save(){try{localStorage.setItem(STORE,JSON.stringify(data));}catch{message('저장 공간이 부족해 기여도를 보존하지 못했습니다.');}}
   function current(){
-    if(!data.monsters[data.monster])data.monsters[data.monster]={hp:0,entries:{}};
+    if(!data.monsters[data.monster]||typeof data.monsters[data.monster]!=='object')data.monsters[data.monster]={hp:0,entries:{}};
+    if(!data.monsters[data.monster].entries||typeof data.monsters[data.monster].entries!=='object')data.monsters[data.monster].entries={};
     return data.monsters[data.monster];
   }
   function roster(){return typeof window.guildRosterSnapshot==='function'?window.guildRosterSnapshot():[];}
   function calculation(){
-    const boss=current();
+    const entries=current().entries;
     const people=roster().map(m=>{
-      const stored=boss.entries[m.id]||{};
+      const stored=entries[m.id]||{};
       return {...m,raw:asNumber(stored.raw,100),knocks:Math.floor(asNumber(stored.knocks,100))};
     });
     return Engine.calculate(people,data.options);
   }
   function clearDraw(){data.lastDraw=null;$('zoneOneResults').innerHTML='';}
   function renderMonsters(){
-    $('monsterChoices').innerHTML=Engine.MONSTERS.map((m,i)=>`<button class="pill monster-chip ${m===data.monster?'active':''}" data-monster="${esc(m)}" aria-pressed="${m===data.monster}">${['🐭','🐝','🦀','🐇'][i]}<span>${esc(m)}</span></button>`).join('');
+    $('monsterChoices').innerHTML=Engine.MONSTERS.map((m,i)=>`<button class="z1-monster-choice ${m===data.monster?'active':''}" type="button" data-monster="${esc(m)}" aria-pressed="${m===data.monster}"><span class="z1-monster-symbol" aria-hidden="true">${MONSTER_ICONS[i]}</span><span class="z1-monster-name">${esc(m)}</span><span class="z1-monster-sub">${['전장의 쥐','유령 벌','유령 게','유령 토끼'][i]}</span></button>`).join('');
+    $('z1HeroMonster').textContent=data.monster;
+  }
+  function renderConditions(){
+    $('zoneOneInputMode').value=data.options.inputMode;
+    $('zoneOneSpeed').value=String(data.options.speed===2?2:1);
+    $('zoneOneServerBonus').value=asNumber(data.options.serverBonus,1e6);
+    $('zoneOneKnockLoss').value=asNumber(data.options.lossPerKnock,100);
+    $('z1HeroSpeed').textContent=`${data.options.speed===2?'2':'1'}배속`;
+    $('z1ModeNote').textContent=data.options.inputMode==='final'
+      ?'게임에 표시된 최종 % 입력 중: 격추 보너스·배속·격추 손실을 중복 적용하지 않습니다.'
+      :'보정 전 % 입력 중: 기본 격추 + 1구역 추가 격추 + 서버 격추와 배속·격추 손실을 반영합니다.';
+    document.querySelectorAll('[data-z1-speed]').forEach(b=>{
+      const active=Number(b.dataset.z1Speed)===(data.options.speed===2?2:1);
+      b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+    });
+  }
+  function visibleMembers(){
+    const entries=current().entries;
+    return roster().filter(m=>{
+      const byGroup=groupFilter==='all'||String(Number(m.group)||0)===groupFilter;
+      const byName=!memberSearch||m.name.toLocaleLowerCase().includes(memberSearch);
+      const hasValue=!filledOnly||asNumber(entries[m.id]?.raw,100)>0;
+      return byGroup&&byName&&hasValue;
+    });
+  }
+  function renderFilters(){
+    document.querySelectorAll('[data-z1-filter]').forEach(b=>{
+      const active=b.dataset.z1Filter===groupFilter;
+      b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+    });
+    $('z1FilledOnly').classList.toggle('z1-selected',filledOnly);
+    $('z1FilledOnly').setAttribute('aria-pressed',String(filledOnly));
+    $('z1MemberCount').textContent=`${roster().filter(m=>asNumber(current().entries[m.id]?.raw,100)>0).length}/${roster().length}명 입력`;
   }
   function renderMembers(){
-    const people=roster();
+    renderFilters();
+    const people=roster(),visible=visibleMembers(),entries=current().entries;
     if(!people.length){
-      $('zoneOneMembers').innerHTML='<div class="empty-zone"><img src="assets/note-hamster.png" alt="" loading="lazy"><p>길드원이 아직 없어요.<br>길드원 관리에서 이름과 군을 등록해 주세요.</p></div>';
-      updateTotals();return;
+      $('zoneOneMembers').innerHTML='<div class="z1-empty"><img src="assets/note-hamster.png" alt="" loading="lazy"><p>아직 길드원이 없어요.<small>길드원 관리에서 이름과 군을 등록해 주세요.</small></p></div>';
+    } else if(!visible.length){
+      $('zoneOneMembers').innerHTML='<div class="z1-empty z1-empty-short"><p>표시할 길드원이 없어요.<small>검색·군 선택·입력된 인원 필터를 확인해 주세요.</small></p></div>';
+    } else {
+      const computed=new Map(calculation().people.map(p=>[p.id,p]));
+      const hp=asNumber(current().hp,1e15);
+      $('zoneOneMembers').innerHTML=visible.map((m,i)=>{
+        const stored=entries[m.id]||{},g=Number(m.group)||0,c=computed.get(m.id);
+        const effective=c?c.effective:0;
+        return `<article class="z1-member-card" data-zone-member="${esc(m.id)}"><div class="z1-member-top"><div class="z1-member-identity"><span class="z1-avatar" aria-hidden="true">${esc(m.name.slice(0,1))}</span><div><strong>${esc(m.name)}</strong><div class="z1-member-badges"><span class="group-badge group-${g}">${g?g+'군':'미지정'}</span><span class="z1-bonus-badge">격추 ${pct(asNumber(m.bonus,1e6)+asNumber(m.zone1Bonus,1e6))}</span></div></div></div><span class="z1-person-index">#${String(i+1).padStart(2,'0')}</span></div>
+          <div class="z1-member-inputs"><div class="field"><label for="z1-contrib-${i}">기여도 (%)</label><div class="z1-input-suffix"><input id="z1-contrib-${i}" type="number" min="0" max="100" step="0.01" inputmode="decimal" data-zone-field="raw" data-member-id="${esc(m.id)}" value="${asNumber(stored.raw,100)}"><span>%</span></div></div>
+          <div class="field"><label for="z1-knock-${i}">격추 횟수</label><input id="z1-knock-${i}" type="number" min="0" max="100" step="1" inputmode="numeric" data-zone-field="knocks" data-member-id="${esc(m.id)}" value="${Math.floor(asNumber(stored.knocks,100))}" ${data.options.inputMode==='final'?'disabled title="최종 기여율 입력에서는 격추 손실이 적용되지 않습니다."':''}></div></div>
+          <div class="z1-member-metrics"><span>적용 기여도 <strong data-zone-effective="${esc(m.id)}">${pct(effective)}</strong></span><span>기여 HP <strong data-zone-hp="${esc(m.id)}">${hp>0?fmt(hp*effective/100):'—'}</strong></span></div>
+          <div class="z1-member-progress"><span data-zone-progress="${esc(m.id)}" style="width:${Math.max(0,Math.min(100,effective))}%"></span></div></article>`;
+      }).join('');
     }
-    const entries=current().entries;
-    $('zoneOneMembers').innerHTML=`<div class="zone-member-list">${people.map(m=>{
-      const stored=entries[m.id]||{};
-      const group=m.group?`${m.group}군`:'미지정';
-      return `<div class="zone-member" data-zone-member="${esc(m.id)}"><div class="zone-member-info"><strong>${esc(m.name)}</strong><span class="group-badge group-${m.group||0}">${group}</span><span class="zone-bonus-note">1구역 격추 ${pct((m.bonus||0)+(m.zone1Bonus||0))}</span></div>
-      <div class="zone-member-fields"><label>기여도 (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-zone-field="raw" data-member-id="${esc(m.id)}" value="${asNumber(stored.raw,100)}"></label>
-      <label>격추 횟수<input type="number" min="0" max="100" step="1" inputmode="numeric" data-zone-field="knocks" data-member-id="${esc(m.id)}" value="${Math.floor(asNumber(stored.knocks,100))}"></label></div></div>`;
-    }).join('')}</div>`;
     updateTotals();
   }
   function updateTotals(){
-    const c=calculation(),hp=asNumber(current().hp),hasRoster=roster().length>0;
-    const sumText=c.overCap?'<div class="msg">보정된 길드원 기여도 합계가 100%를 초과했습니다. 추첨 전 수치를 확인해 주세요.</div>':'';
+    const c=calculation(),hp=asNumber(current().hp,1e15),hasRoster=roster().length>0;
     const remaining=c.overCap?'100% 초과':pct(c.remaining);
-    $('zoneOneTotals').innerHTML=`<div class="zone-summary-grid"><div><small>길드 기여도 합계</small><strong>${pct(c.total)}</strong></div><div><small>외부·미입력 기여도</small><strong>${remaining}</strong></div><div><small>길드 기여 HP</small><strong>${hp>0?fmt(hp*c.total/100):'최대 HP 미입력'}</strong></div></div>${sumText}${hasRoster?'<p class="hint">길드원 합계가 100% 미만인 것은 정상입니다. 미지정 군은 기여율에는 포함되지만 보상 추첨 대상에서는 제외됩니다.</p>':''}`;
+    const sumText=c.overCap?'<div class="msg">기여도 합계가 100%를 초과했어요. 추첨 전 입력값을 확인해 주세요.</div>':'';
+    const width=Math.max(0,Math.min(100,c.total));
+    $('zoneOneTotals').innerHTML=`<div class="z1-total-head"><span>길드 전체 기여도</span><strong>${pct(c.total)}</strong></div><div class="z1-total-track"><span style="width:${width}%"></span></div>
+      <div class="z1-summary-grid"><div><small>길드 기여도</small><strong>${pct(c.total)}</strong></div><div><small>외부·미입력 기여도</small><strong>${remaining}</strong></div><div><small>길드 기여 HP</small><strong>${hp>0?fmt(hp*c.total/100):'—'}</strong></div></div>
+      ${sumText}${hasRoster?'<p class="z1-muted-note">외부 참가자가 있으면 합계가 100% 미만이어도 정상이에요. 미지정 군은 기여율 합계에는 포함되지만 보상 추첨에서는 제외돼요.</p>':''}`;
+    const byId=new Map(c.people.map(p=>[p.id,p]));
+    for(const el of $('zoneOneMembers').querySelectorAll('[data-zone-member]')){
+      const id=el.dataset.zoneMember,p=byId.get(id);if(!p)continue;
+      const effective=el.querySelector('[data-zone-effective]');
+      const playerHp=el.querySelector('[data-zone-hp]');
+      const progress=el.querySelector('[data-zone-progress]');
+      if(effective)effective.textContent=pct(p.effective);
+      if(playerHp)playerHp.textContent=hp>0?fmt(hp*p.effective/100):'—';
+      if(progress)progress.style.width=`${Math.max(0,Math.min(100,p.effective))}%`;
+    }
+    renderFilters();
   }
   function renderRewardList(){
-    if(!data.rewards.length){$('rewardList').innerHTML='<p class="note">획득한 보상이 아직 없습니다. 이름과 수량·가치를 등록하세요.</p>';return;}
-    $('rewardList').innerHTML=`<div class="reward-list">${data.rewards.map((r,i)=>`<div class="reward-entry"><span><strong>${esc(r.name)}</strong><small> ${fmt(r.quantity)}개 · 개당 가치 ${fmt(r.value)}</small></span><button class="danger small" data-delete-reward="${i}" aria-label="${esc(r.name)} 제거">삭제</button></div>`).join('')}</div>`;
+    if(!data.rewards.length){$('rewardList').innerHTML='<div class="z1-reward-empty">등록한 보상이 없어요. 보상을 추가하면 군별로 추첨할 수 있어요.</div>';return;}
+    $('rewardList').innerHTML=`<div class="reward-list">${data.rewards.map((r,i)=>`<div class="reward-entry z1-reward-entry"><span class="z1-reward-star" aria-hidden="true">✦</span><span><strong>${esc(r.name)}</strong><small> ${fmt(r.quantity)}개 · 개당 가치 ${fmt(r.value)}</small></span><button class="danger small" type="button" data-delete-reward="${i}" aria-label="${esc(r.name)} 제거">삭제</button></div>`).join('')}</div>`;
   }
   function renderResult(){
     const r=data.lastDraw;
     if(!r){$('zoneOneResults').innerHTML='';return;}
-    const groupRows=[1,2,3,4].map(g=>{
+    const groupCards=[1,2,3,4].map(g=>{
       const s=r.groupStats[g];
-      return `<tr><td>${g}군</td><td>${Engine.SHARES[g]}%</td><td>${s.assigned}개</td><td>${s.distributed}개</td><td>${s.held}개</td><td>${fmt(s.value)}</td></tr>`;
+      return `<div class="z1-result-group z1-q${g}"><span>${g}군 · ${Engine.SHARES[g]}%</span><strong>${s.assigned}개 할당</strong><small>지급 ${s.distributed} · 보류 ${s.held}</small></div>`;
     }).join('');
     const peopleRows=r.people.filter(m=>m.wonCount>0).sort((a,b)=>a.group-b.group||b.wonValue-a.wonValue).map(m=>{
       const summary=m.won.map(x=>`${x.name} (${fmt(x.value)})`).join(', ');
       return `<tr><td>${m.group}군</td><td>${esc(m.name)}</td><td>${pct(m.effective)}</td><td>${m.wonCount}</td><td>${fmt(m.wonValue)}</td><td class="item-list">${esc(summary)}</td></tr>`;
     }).join('');
-    $('zoneOneResults').innerHTML=`<div class="draw-result"><h3>추첨 결과</h3><p class="note">총 ${r.totalCount}개 · 총 가치 ${fmt(r.totalValue)} · 실제 지급 ${r.rewards.length}개 · 보류 ${r.held.length}개</p>
-    <h3>1차 군별 할당</h3><div class="table-scroll"><table class="reward-table"><thead><tr><th>군</th><th>목표 비율</th><th>할당</th><th>지급</th><th>보류</th><th>할당 가치</th></tr></thead><tbody>${groupRows}</tbody></table></div>
-    <h3>2차 개인별 추첨</h3><div class="table-scroll"><table class="reward-table"><thead><tr><th>군</th><th>길드원</th><th>유효 기여율</th><th>개수</th><th>합계 가치</th><th>보상 내역</th></tr></thead><tbody>${peopleRows||'<tr><td colspan="6">지급된 보상이 없습니다.</td></tr>'}</tbody></table></div>
-    ${r.held.length?`<div class="msg">참여 기여도가 있는 길드원이 없는 군에 배정된 보상 ${r.held.length}개는 보류했어요. 다른 군으로 임의 재배분하지 않습니다.</div>`:''}
-    <p class="hint">무작위 추첨 특성상 다시 추첨하면 결과가 바뀝니다. 지급 확정 전 결과를 복사해 두세요.</p><button class="secondary full-width" id="copyZoneOneResult">추첨 결과 복사</button></div>`;
+    $('zoneOneResults').innerHTML=`<div class="draw-result z1-draw-result"><div class="z1-result-title"><span aria-hidden="true">✦</span><div><h3>보상 추첨 결과</h3><p>총 ${r.totalCount}개 · 지급 ${r.rewards.length}개 · 보류 ${r.held.length}개</p></div></div>
+      <div class="z1-result-quick"><div><small>총 보상 가치</small><strong>${fmt(r.totalValue)}</strong></div><div><small>실제 지급</small><strong>${r.rewards.length}개</strong></div></div>
+      <h3>1차 군별 할당</h3><div class="z1-result-groups">${groupCards}</div>
+      <h3>2차 개인별 추첨</h3><div class="table-scroll"><table class="reward-table"><thead><tr><th>군</th><th>길드원</th><th>기여도</th><th>개수</th><th>합계 가치</th><th>보상 내역</th></tr></thead><tbody>${peopleRows||'<tr><td colspan="6">지급된 보상이 없어요.</td></tr>'}</tbody></table></div>
+      ${r.held.length?`<div class="msg">참여자가 없는 군의 ${r.held.length}개 보상은 보류했어요. 다른 군으로 자동 재배분하지 않습니다.</div>`:''}
+      <p class="z1-muted-note">다시 추첨하면 결과가 달라질 수 있어요. 지급 전에 결과를 복사해 주세요.</p>
+      <button class="secondary z1-copy-result" type="button" id="copyZoneOneResult">추첨 결과 복사</button></div>`;
   }
   function render(){
     if(!$('zoneOnePanel'))return;
     renderMonsters();
-    const boss=current();
-    $('zoneOneHp').value=boss.hp||'';
-    $('zoneOneInputMode').value=data.options.inputMode;
-    $('zoneOneSpeed').value=String(data.options.speed===2?2:1);
-    $('zoneOneServerBonus').value=asNumber(data.options.serverBonus,1e6);
-    $('zoneOneKnockLoss').value=asNumber(data.options.lossPerKnock,100);
-    renderMembers();renderRewardList();renderResult();
+    $('zoneOneHp').value=current().hp||'';
+    renderConditions();renderMembers();renderRewardList();renderResult();
   }
   function addReward(){
     const name=$('newRewardName').value.trim();
@@ -728,27 +895,41 @@
   }
   async function copyResult(){
     const r=data.lastDraw;if(!r)return;
-    const lines=[`상층 1구역 ${data.monster} 보상 추첨`, `총 ${r.totalCount}개 · 총 가치 ${fmt(r.totalValue)}`];
-    for(let g=1;g<=4;g++){lines.push(`${g}군 (${Engine.SHARES[g]}%): 할당 ${r.groupStats[g].assigned} / 지급 ${r.groupStats[g].distributed} / 보류 ${r.groupStats[g].held}`);}
+    const lines=[`상층 1구역 ${data.monster} 보상 추첨`,`총 ${r.totalCount}개 · 총 가치 ${fmt(r.totalValue)}`];
+    for(let g=1;g<=4;g++)lines.push(`${g}군 (${Engine.SHARES[g]}%): 할당 ${r.groupStats[g].assigned} / 지급 ${r.groupStats[g].distributed} / 보류 ${r.groupStats[g].held}`);
     for(const m of r.people.filter(m=>m.wonCount>0))lines.push(`${m.group}군 ${m.name}: ${m.won.map(x=>x.name).join(', ')} / 가치 ${fmt(m.wonValue)}`);
     if(r.held.length)lines.push(`보류 ${r.held.length}개`);
     try{await navigator.clipboard.writeText(lines.join('\n'));message('추첨 결과를 복사했어요.');}
-    catch {message('복사에 실패했습니다. 브라우저 권한을 확인해 주세요.');}
+    catch{message('복사에 실패했습니다. 브라우저 권한을 확인해 주세요.');}
   }
   function init(){
     if(!$('zoneOnePanel'))return;
     $('monsterChoices').addEventListener('click',e=>{
-      const target=e.target.closest('[data-monster]');if(!target)return;
-      if(!Engine.MONSTERS.includes(target.dataset.monster))return;
+      const target=e.target.closest('[data-monster]');if(!target||!Engine.MONSTERS.includes(target.dataset.monster))return;
       data.monster=target.dataset.monster;save();render();
     });
     $('zoneOneHp').addEventListener('input',e=>{current().hp=asNumber(e.target.value,1e15);clearDraw();save();updateTotals();});
     for(const [id,field,max] of [['zoneOneInputMode','inputMode',0],['zoneOneSpeed','speed',2],['zoneOneServerBonus','serverBonus',1e6],['zoneOneKnockLoss','lossPerKnock',100]]){
       $(id).addEventListener('change',e=>{
         data.options[field]=field==='inputMode'?(e.target.value==='raw'?'raw':'final'):(field==='speed'?(Number(e.target.value)===2?2:1):asNumber(e.target.value,max));
-        clearDraw();save();updateTotals();
+        clearDraw();save();renderConditions();renderMembers();
       });
     }
+    document.querySelectorAll('[data-z1-speed]').forEach(btn=>btn.addEventListener('click',()=>{
+      $('zoneOneSpeed').value=btn.dataset.z1Speed;
+      $('zoneOneSpeed').dispatchEvent(new Event('change',{bubbles:true}));
+    }));
+    document.querySelectorAll('[data-z1-filter]').forEach(btn=>btn.addEventListener('click',()=>{groupFilter=btn.dataset.z1Filter;renderMembers();}));
+    $('z1MemberSearch').addEventListener('input',e=>{memberSearch=e.target.value.trim().toLocaleLowerCase();renderMembers();});
+    $('z1FilledOnly').addEventListener('click',()=>{filledOnly=!filledOnly;renderMembers();});
+    $('z1ResetVisible').addEventListener('click',()=>{
+      const visible=visibleMembers();
+      const changed=visible.filter(m=>asNumber(current().entries[m.id]?.raw,100)>0||asNumber(current().entries[m.id]?.knocks,100)>0);
+      if(!changed.length){message('초기화할 기여도가 없어요.');return;}
+      if(!confirm(`화면에 표시된 ${changed.length}명의 기여도와 격추 횟수를 초기화할까요?`))return;
+      for(const m of changed)delete current().entries[m.id];
+      clearDraw();save();renderMembers();message('표시 인원의 기여도를 초기화했어요.');
+    });
     $('zoneOneMembers').addEventListener('input',e=>{
       const input=e.target.closest('[data-zone-field]');if(!input)return;
       const id=input.dataset.memberId;
@@ -756,7 +937,9 @@
       const entry=current().entries[id]||(current().entries[id]={raw:0,knocks:0});
       entry[input.dataset.zoneField]=input.dataset.zoneField==='knocks'?Math.floor(asNumber(input.value,100)):asNumber(input.value,100);
       clearDraw();save();updateTotals();
+      // If filtering by non-zero contribution, refresh after a finished edit to preserve the input cursor.
     });
+    $('zoneOneMembers').addEventListener('change',()=>{if(filledOnly)renderMembers();});
     $('addReward').addEventListener('click',addReward);
     $('rewardList').addEventListener('click',e=>{
       const button=e.target.closest('[data-delete-reward]');if(!button)return;
@@ -766,7 +949,7 @@
     });
     $('drawZoneOne').addEventListener('click',()=>{
       const calc=calculation();
-      if(calc.overCap){message('총 기여율이 100%를 넘어 추첨을 중단했어요.');return;}
+      if(calc.overCap){message('기여도 합계가 100%를 넘어 추첨을 중단했어요.');return;}
       if(!calc.people.some(x=>x.effective>0&&x.group>=1&&x.group<=4)){message('기여도가 있고 1~4군에 소속된 길드원이 필요해요.');return;}
       if(!data.rewards.length){message('획득한 보상을 먼저 등록해 주세요.');return;}
       try{
@@ -778,11 +961,7 @@
       }catch(error){message(error.message||'추첨 실패');}
     });
     $('zoneOneResults').addEventListener('click',e=>{if(e.target.closest('#copyZoneOneResult'))copyResult();});
-    document.addEventListener('guild:updated',()=>{
-      // Re-render only when roster changes, not on contribution keystrokes.
-      if(data.lastDraw){data.lastDraw=null;save();}
-      renderMembers();renderResult();
-    });
+    document.addEventListener('guild:updated',()=>{if(data.lastDraw){data.lastDraw=null;save();}renderMembers();renderResult();});
     render();
   }
   window.ZoneOneUI={render,init};
