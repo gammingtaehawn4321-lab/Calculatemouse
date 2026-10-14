@@ -58,7 +58,7 @@
 <div id="zoneTwoPanel" hidden>
 
 <div class="card"><div class="pill-group" role="group" aria-label="계산 모드" hidden><button id="bossMode" class="pill active">상층 보스</button><button id="strikeMode" class="pill">일격 점수</button></div>
-<p class="hint">기존 사이트의 보정식(기본 654, 170초, 2배속 손실 4.29%)을 사용합니다.</p>
+
 <div id="bossControls"><div class="field"><label for="bossHp">보스 총 HP</label><input id="bossHp" type="number" min="1" step="1" inputmode="numeric"></div>
 <div id="bossPresets" class="pill-group" style="margin-top:9px"></div></div>
 <div class="grid" style="margin-top:10px"><div class="field"><label for="speed">배속</label><select id="speed"><option value="1">1배속</option><option value="2">2배속 (-4.29%)</option></select></div>
@@ -91,7 +91,7 @@
 </div>
 <div class="card"><h2>남은 시간 계산기</h2><div class="grid"><div class="field"><label for="remainingMin">현재 남은 시간 (분)</label><input id="remainingMin" type="number" min="0" value="0"></div><div class="field"><label for="remainingSec">현재 남은 시간 (초)</label><input id="remainingSec" type="number" min="0" value="0"></div><div class="field"><label for="targetMin">목표 시간 (분)</label><input id="targetMin" type="number" min="0" value="0"></div><div class="field"><label for="targetSec">목표 시간 (초)</label><input id="targetSec" type="number" min="0" value="0"></div></div><div id="remainingOutput" class="result-block"></div></div>
 <div class="card"><h2>데이터 백업 · 복원</h2><p class="note">이 기기의 계산 설정과 마지막 길드원 데이터가 백업됩니다. 공용 모드에서 복원은 제한되며, 서버 데이터는 이 백업으로 덮어쓰지 않습니다.</p><div class="actions"><button id="exportButton" class="primary">JSON 백업 저장</button><button id="showBackup" class="secondary">백업 텍스트 보기</button></div><div id="backupArea" hidden><label for="backupText" class="hint">복사용 백업 데이터</label><textarea id="backupText" readonly></textarea></div><hr class="sep"><label for="importFile" class="hint">JSON 백업 불러오기</label><input id="importFile" type="file" accept="application/json,.json"><p class="hint">복원하면 현재 데이터가 교체됩니다.</p></div>
-<div class="card"><h2>안내</h2><p class="note">이 앱은 원본 공개 계산식을 참조해 별도로 작성한 모바일 버전입니다. 상층 모드에서는 기본 격추값과 서버 격추값만, 일격 모드에서는 선택한 지역의 격추값도 합산합니다.</p><button id="resetButton" class="danger">길드원 목록 초기화</button></div>
+<div class="card"><h2>데이터 초기화</h2><button id="resetButton" class="danger">길드원 목록 초기화</button></div>
 </section>
 </main><div id="toast" class="status" role="status" hidden></div>
 <script src="calc.js"></script><script src="shared.js"></script><script src="app.js"></script></body></html>
