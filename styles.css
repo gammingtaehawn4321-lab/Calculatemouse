@@ -408,3 +408,48 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.48;cur
   height:84px;
   max-width:100%;
 }
+
+
+/* Global background music controls — available on every app tab. */
+.visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.music-controls{
+  position:fixed;
+  right:14px;
+  top:11px;
+  z-index:40;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px 6px 6px;
+  border-radius:100px;
+  background:rgba(30,13,48,.82);
+  border:1px solid rgba(255,219,165,.42);
+  box-shadow:0 5px 24px rgba(0,0,0,.28);
+  backdrop-filter:blur(15px);
+  -webkit-backdrop-filter:blur(15px);
+}
+.music-toggle{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  padding:4px 7px;
+  min-height:32px;
+  background:rgba(115,57,145,.40);
+  border:1px solid rgba(245,196,255,.20);
+  border-radius:100px;
+  color:#fff2d5;
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.music-toggle.playing{background:rgba(195,144,60,.28);border-color:rgba(255,217,138,.42)}
+#musicIcon{font-size:18px;line-height:1}
+.music-volume{width:68px;max-width:18vw;height:24px;min-height:24px;accent-color:#ffda9a;touch-action:pan-x;cursor:pointer}
+@media(max-width:680px){
+  .music-controls{top:auto;bottom:calc(80px + env(safe-area-inset-bottom,0px));right:10px;padding:5px 8px 5px 5px}
+  .music-toggle{min-height:35px}
+  .music-volume{width:65px;max-width:17vw}
+}
+@media(max-width:360px){.music-toggle #musicText{display:none}.music-controls{gap:4px}.music-volume{width:55px}}
+@media print{.music-controls{display:none!important}}

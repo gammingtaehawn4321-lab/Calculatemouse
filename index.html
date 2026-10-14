@@ -93,5 +93,16 @@
 <div class="card"><h2>데이터 백업 · 복원</h2><p class="note">이 기기의 계산 설정과 마지막 길드원 데이터가 백업됩니다. 공용 모드에서 복원은 제한되며, 서버 데이터는 이 백업으로 덮어쓰지 않습니다.</p><div class="actions"><button id="exportButton" class="primary">JSON 백업 저장</button><button id="showBackup" class="secondary">백업 텍스트 보기</button></div><div id="backupArea" hidden><label for="backupText" class="hint">복사용 백업 데이터</label><textarea id="backupText" readonly></textarea></div><hr class="sep"><label for="importFile" class="hint">JSON 백업 불러오기</label><input id="importFile" type="file" accept="application/json,.json"><p class="hint">복원하면 현재 데이터가 교체됩니다.</p></div>
 <div class="card"><h2>데이터 초기화</h2><button id="resetButton" class="danger">길드원 목록 초기화</button></div>
 </section>
-</main><div id="toast" class="status" role="status" hidden></div>
+</main>
+<div id="musicControls" class="music-controls" role="group" aria-label="배경음악 조절">
+  <button id="musicToggle" class="music-toggle" type="button" aria-label="배경음악 켜기" aria-pressed="false" title="배경음악 켜기">
+    <span id="musicIcon" aria-hidden="true">♫</span><span id="musicText">음악 켜기</span>
+  </button>
+  <label class="visually-hidden" for="musicVolume">배경음악 볼륨</label>
+  <input id="musicVolume" class="music-volume" type="range" min="0" max="100" step="1" value="24" aria-label="배경음악 볼륨" />
+  <span id="musicLive" class="visually-hidden" role="status" aria-live="polite"></span>
+</div>
+<audio id="siteBgm" src="assets/rat-beat.mp3" loop preload="metadata" playsinline></audio>
+<div id="toast" class="status" role="status" hidden></div>
+<script src="music.js" defer></script>
 <script src="calc.js"></script><script src="shared.js"></script><script src="app.js"></script></body></html>
