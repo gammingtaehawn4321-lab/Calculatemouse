@@ -9,8 +9,7 @@
 var APP_SHEET = 'Members';
 var APP_META = 'Meta';
 var MAX_MEMBERS = 200;
-var FIELDS = ['id','name','bonus','minScore','pirate','cat','wolf','food','profileRevision'];
-var BOOTSTRAP_NAMES = ['쩰리','까꿍','제니','유교','타격','구슬요','끄르','달리는곰돌이','루시퍼','봉수','시티즌2','빙하','빙제','빙결','빙왕'];
+var FIELDS = ['id','name','bonus','minScore','pirate','cat','wolf','food','profileRevision','group'];
 
 /** Run ONCE manually from the Apps Script editor; change both placeholder secrets first.
  *  Secrets must be distinct and 20+ characters, preferably randomly generated.
@@ -27,8 +26,7 @@ function setupServer() {
   var sheet = book.getSheets()[0];
   sheet.setName(APP_SHEET);
   sheet.getRange(1, 1, 1, FIELDS.length).setValues([FIELDS]);
-  var rows = BOOTSTRAP_NAMES.map(function(name){return [newMemberId(),name,0,0,0,0,0,0,1];});
-  sheet.getRange(2,1,rows.length,FIELDS.length).setValues(rows);
+  // Begin with an empty roster. Admins add members from the PWA.
   sheet.setFrozenRows(1);
   var meta = book.insertSheet(APP_META);
   meta.getRange('A1:B2').setValues([['key','value'],['revision',1]]);
@@ -76,12 +74,12 @@ function doPost(e) {
 function asMember(row) {
   return {id:String(row[0]),name:String(row[1]),bonus:Number(row[2])||0,minScore:Number(row[3])||0,
     region:{pirate:Number(row[4])||0,cat:Number(row[5])||0,wolf:Number(row[6])||0,food:Number(row[7])||0},
-    profileRevision:Number(row[8])||1};
+    profileRevision:Number(row[8])||1,group:[1,2,3,4].indexOf(Number(row[9]))>=0?Number(row[9]):0};
 }
 function sheetData(id) {
   var book=SpreadsheetApp.openById(id),sheet=book.getSheetByName(APP_SHEET),meta=book.getSheetByName(APP_META);
   if(!sheet||!meta) throw new Error('Shared spreadsheet tabs are missing.');
-  var last=sheet.getLastRow(),rows=last>1?sheet.getRange(2,1,last-1,9).getValues():[];
+  var last=sheet.getLastRow(),rows=last>1?sheet.getRange(2,1,last-1,10).getValues():[];
   return {sheet:sheet,meta:meta,rows:rows,revision:Number(meta.getRange('B2').getValue())||1};
 }
 function snapshot(data) {
@@ -99,6 +97,24 @@ function cleanNumber(value,max) {
   if(typeof value!=='number' || !isFinite(value) || value<0 || value>max) throw new Error('Invalid numeric value.');
   return value;
 }
+function cleanGroup(v) {
+  if(typeof v!=='number'||!Number.isInteger(v)||v<0||v>4)throw new Error('Group must be an integer from 0 to 4.');
+  return v;
+}
+
+/** Optional one-time migration for a sheet initialized before the group field existed. */
+function migrateRosterGroupColumn() {
+  var id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if(!id)throw new Error('Run setupServer first.');
+  var sheet=SpreadsheetApp.openById(id).getSheetByName(APP_SHEET);
+  if(!sheet)throw new Error('Missing Members sheet.');
+  if(sheet.getRange(1,10).getValue()!=='group')sheet.getRange(1,10).setValue('group');
+  var last=sheet.getLastRow();
+  if(last>1){var range=sheet.getRange(2,10,last-1,1);var values=range.getValues().map(function(r){return [cleanGroupOrZero(r[0])];});range.setValues(values);}
+  Logger.log('Group column ready.');
+}
+function cleanGroupOrZero(v) {return [1,2,3,4].indexOf(Number(v))>=0?Number(v):0;}
+
 function uniqueName(rows,name,exceptId) {
   return !rows.some(function(row){return String(row[0])!==exceptId&&String(row[1]).toLocaleLowerCase()===name.toLocaleLowerCase();});
 }
@@ -111,7 +127,8 @@ function mutate(id,op) {
     var name=cleanName(op.name);
     if(!uniqueName(data.rows,name,''))return bad('DUPLICATE','A member with this name already exists.',data);
     var bonus=cleanNumber(op.bonus,1000000);
-    data.sheet.appendRow([newMemberId(),name,bonus,0,0,0,0,0,1]);
+    var group=cleanGroup(op.group == null ? 0 : op.group);
+    data.sheet.appendRow([newMemberId(),name,bonus,0,0,0,0,0,1,group]);
   } else if (action==='update'||action==='delete') {
     if(typeof op.id!=='string')return bad('BAD_ID','Invalid member ID.',data);
     var index=data.rows.findIndex(function(row){return String(row[0])===op.id;});
@@ -123,9 +140,9 @@ function mutate(id,op) {
       data.sheet.deleteRow(index+2);
     } else {
       var field=op.field;
-      var col={name:1,bonus:2,minScore:3,pirate:4,cat:5,wolf:6,food:7}[field];
+      var col={name:1,bonus:2,minScore:3,pirate:4,cat:5,wolf:6,food:7,group:9}[field];
       if(typeof col!=='number')return bad('BAD_FIELD','Field not editable.',data);
-      var value=field==='name'?cleanName(op.value):cleanNumber(op.value,field==='minScore'?1000000000:1000000);
+      var value=field==='name'?cleanName(op.value):field==='group'?cleanGroup(op.value):cleanNumber(op.value,field==='minScore'?1000000000:1000000);
       if(field==='name'&&!uniqueName(data.rows,value,op.id))return bad('DUPLICATE','A member with this name already exists.',data);
       data.sheet.getRange(index+2,col+1).setValue(value);
       data.sheet.getRange(index+2,9).setValue(Number(row[8])+1);

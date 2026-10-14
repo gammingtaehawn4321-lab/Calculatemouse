@@ -1,9 +1,110 @@
+/* 상층 1구역 계산 및 2단계 보상 추첨. 독립된 순수 함수. */
+(function(root,factory){
+  const api=factory();
+  if(typeof module==='object'&&module.exports)module.exports=api;
+  if(root)root.ZoneOneEngine=api;
+})(typeof window!=='undefined'?window:undefined, function(){
+  'use strict';
+  const SHARES=Object.freeze({1:30,2:25,3:25,4:20});
+  const MONSTERS=Object.freeze(['격전쥐','유령 꿀벌','유령 꽃게','유령 토끼']);
+  const FINITE=(n,min=0,max=1e9)=>Number.isFinite(Number(n))?Math.max(min,Math.min(max,Number(n))):min;
+  function calculate(entries, options={}){
+    const speed=Number(options.speed)===1?1:2;
+    const mode=options.inputMode==='final'?'final':'raw';
+    const serverBonus=FINITE(options.serverBonus,0,1000000);
+    const lossPerKnock=FINITE(options.lossPerKnock,0,100);
+    const factor=speed===2?0.9571:1;
+    const people=entries.map(m=>{
+      const raw=FINITE(m.raw,0,100);
+      const bonus=FINITE(m.bonus,0,1000000);
+      const knocks=Math.floor(FINITE(m.knocks,0,100));
+      const adjusted=mode==='final'?raw:raw*(1+(bonus+serverBonus)/100)*factor*Math.pow(1-lossPerKnock/100,knocks);
+      return {id:String(m.id),name:String(m.name),group:Number(m.group)||0,raw,knocks,bonus,effective:adjusted};
+    });
+    const total=people.reduce((s,p)=>s+p.effective,0);
+    return {people,total,remaining:Math.max(0,100-total),overCap:total>100.000001,speed,inputMode:mode};
+  }
+  function groupQuotas(count){
+    if(!Number.isSafeInteger(count)||count<0)throw new Error('보상 수량이 잘못되었습니다.');
+    const result={};let allocated=0;
+    const leftovers=[];
+    for(let g=1;g<=4;g++){
+      const exact=count*SHARES[g]/100;
+      const floored=Math.floor(exact);
+      result[g]=floored;allocated+=floored;
+      leftovers.push({group:g,frac:exact-floored});
+    }
+    leftovers.sort((a,b)=>b.frac-a.frac||a.group-b.group);
+    for(let i=0;i<count-allocated;i++)result[leftovers[i].group]++;
+    return result;
+  }
+  function pickWeighted(options, weight, random){
+    let total=0;const scores=options.map(x=>{let w=Math.max(0,weight(x));total+=w;return w});
+    if(total<=0)return null;
+    const r=Math.min(.999999999999,Math.max(0,random()))*total;
+    let acc=0;
+    for(let i=0;i<options.length;i++){
+      acc+=scores[i];if(r<acc)return options[i];
+    }
+    return options[options.length-1];
+  }
+  // 1차: 보상 *개수*를 30/25/25/20으로 최대 잔여 방식으로 확정.
+  // 2차: 각 보상 단위가 군에 무작위 귀속되고, 해당 군 안에서 기여도/가치를 가중한 추첨.
+  function draw({members,items},rng=Math.random){
+    if(!Array.isArray(members)||!Array.isArray(items))throw new Error('추첨 입력이 올바르지 않습니다.');
+    const safeItems=items.map((item,i)=>({
+      id:String(item.id??i),name:String(item.name||'').trim(),
+      quantity:Number(item.quantity),value:Number(item.value)
+    }));
+    if(safeItems.some(x=>!x.name||!Number.isSafeInteger(x.quantity)||x.quantity<1||x.quantity>2000||!Number.isFinite(x.value)||x.value<=0||x.value>1e9))
+      throw new Error('보상 이름·개수(1~2000)·가치(0 초과)를 확인하세요.');
+    const totalCount=safeItems.reduce((s,x)=>s+x.quantity,0);
+    if(totalCount>2000)throw new Error('한 번에 추첨할 보상은 총 2000개 이하로 입력하세요.');
+    const people=members.filter(m=>Number(m.group)>=1&&Number(m.group)<=4).map(m=>({
+      id:String(m.id),name:String(m.name),group:Number(m.group),effective:FINITE(m.effective,0,100),
+      won:[],wonValue:0,wonCount:0
+    }));
+    const quota=groupQuotas(totalCount);
+    const left={...quota};
+    const groupStats={};for(let g=1;g<=4;g++)groupStats[g]={group:g,quota:quota[g],assigned:0,distributed:0,held:0,value:0};
+    const rewards=[];const held=[];
+    const maxValue=Math.max(1,...safeItems.map(x=>x.value));
+    const units=[];
+    for(const item of safeItems)for(let i=0;i<item.quantity;i++)units.push(item);
+    // Value affects second-stage selection; randomized order prevents input ordering bias.
+    for(let i=units.length-1;i>0;i--){const j=Math.floor(Math.max(0,Math.min(.999999999999,rng()))*(i+1));[units[i],units[j]]=[units[j],units[i]];}
+    const totalValue=units.reduce((s,x)=>s+x.value,0);
+    for(const item of units){
+      const groups=[1,2,3,4].filter(g=>left[g]>0);
+      const group=pickWeighted(groups,g=>left[g],rng);
+      if(group===null)throw new Error('군별 할당 수량 계산 오류');
+      left[group]--;groupStats[group].assigned++;groupStats[group].value+=item.value;
+      const eligible=people.filter(m=>m.group===group&&m.effective>0);
+      if(eligible.length===0){groupStats[group].held++;held.push({group,item:item.name,value:item.value});continue;}
+      const rarity=item.value/maxValue;
+      const power=0.7+1.1*rarity;
+      const median=totalValue/Math.max(totalCount,1);
+      const selected=pickWeighted(eligible,m=>Math.pow(m.effective,power)/(1+m.wonValue/Math.max(1,median*3)),rng);
+      if(!selected){groupStats[group].held++;held.push({group,item:item.name,value:item.value});continue;}
+      selected.won.push({name:item.name,value:item.value});selected.wonCount++;selected.wonValue+=item.value;
+      groupStats[group].distributed++;
+      rewards.push({group,memberId:selected.id,memberName:selected.name,item:item.name,value:item.value});
+    }
+    const actualValue=Object.values(groupStats).reduce((s,g)=>s+g.value,0);
+    return {quota,groupStats,people,totalCount,totalValue,actualValue,rewards,held};
+  }
+  return {SHARES,MONSTERS,calculate,groupQuotas,draw};
+});
+
+
+/* Main application */
 'use strict';
 (() => {
   const C = window.KkoaengiCalc;
   const STORAGE_KEY = 'gyesanjungiji-mobile-v3';
   const OLD_STORAGE_KEY = 'kkoaengi-mobile-v2';
-  const DEFAULT_NAMES = ['쩰리','까꿍','제니','유교','타격','구슬요','끄르','달리는곰돌이','루시퍼','봉수','시티즌2','빙하','빙제','빙결','빙왕'];
+  // Legacy names are only used to recognize and clean up untouched starter data.
+  const LEGACY_STARTER_NAMES = ['쩰리','까꿍','제니','유교','타격','구슬요','끄르','달리는곰돌이','루시퍼','봉수','시티즌2','빙하','빙제','빙결','빙왕'];
   const REGIONS = [{key:'pirate',name:'해적'},{key:'cat',name:'고양이'},{key:'wolf',name:'늑대'},{key:'food',name:'음식'}];
   const BOSSES = [{name:'바나냥',hp:500000},{name:'루나',hp:450000},{name:'루니',hp:400000},{name:'루이',hp:350000}];
   const $ = id => document.getElementById(id);
@@ -15,15 +116,22 @@
   let idCounter = 0;
   const makeId = () => `m${Date.now().toString(36)}x${(++idCounter).toString(36)}`;
   function member(name, active = false) {
-    return {id:makeId(),name,active,bonus:0,minScore:0,region:{pirate:0,cat:0,wolf:0,food:0},
+    return {id:makeId(),name,active,group:0,bonus:0,minScore:0,region:{pirate:0,cat:0,wolf:0,food:0},
       profileRevision:0,boss:{mode:'ratio',ratio:0,time:500},strike:{mode:'time',time:500,score:0}};
   }
   function defaults() {
-    const members = DEFAULT_NAMES.map((name,i) => member(name,i<3));
-    members[0].boss.ratio = 33.34;
-    members[1].boss.ratio = 33.33;
-    members[2].boss.ratio = 33.33;
-    return {version:2,members,mode:'boss',bossHp:500000,speed:2,serverBonus:0,region:'pirate'};
+    return {version:2,members:[],mode:'boss',bossHp:500000,speed:2,serverBonus:0,region:'pirate'};
+  }
+  // Preserve any user changes; only erase the exact, never-edited 15-member starter roster.
+  function isUntouchedLegacyRoster(members) {
+    if (!Array.isArray(members) || members.length !== LEGACY_STARTER_NAMES.length) return false;
+    return members.every((m,i) => {
+      if (m.name !== LEGACY_STARTER_NAMES[i] || m.bonus !== 0 || m.minScore !== 0 || m.profileRevision !== 0 || m.active !== (i<3)) return false;
+      if (!REGIONS.every(r => m.region[r.key] === 0)) return false;
+      const expectedRatio = i===0 ? 33.34 : i<3 ? 33.33 : 0;
+      return m.boss.mode === 'ratio' && m.boss.ratio === expectedRatio && m.boss.time === 500 &&
+        m.strike.mode === 'time' && m.strike.time === 500 && m.strike.score === 0;
+    });
   }
   function sanitize(value) {
     if (!value || !Array.isArray(value.members) || value.members.length > 200) throw new Error('잘못된 백업 형식이거나 인원이 너무 많습니다.');
@@ -36,6 +144,7 @@
       const safe = member(name, m.active === true);
       if (typeof m.id === 'string' && /^m[a-z0-9x]{1,40}$/.test(m.id) && !ids.has(m.id)) safe.id = m.id;
       ids.add(safe.id);
+      safe.group = [1,2,3,4].includes(Number(m.group)) ? Number(m.group) : 0;
       safe.profileRevision = Number.isSafeInteger(m.profileRevision) ? Math.max(0,m.profileRevision) : 0;
       safe.bonus = clamp(m.bonus,1e6);
       safe.minScore = clamp(m.minScore);
@@ -51,7 +160,13 @@
   }
   let state;
   try { state = sanitize(JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(OLD_STORAGE_KEY))) } catch { state = defaults(); }
-  let currentTab = 'calc';
+  if (isUntouchedLegacyRoster(state.members)) {
+    state.members = [];
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  }
+  let currentTab = 'home';
+  let memberFilter = 'all';
+  let calcZone = ['one','two','strike'].includes(localStorage.getItem('gyesanjungiji-calc-zone')) ? localStorage.getItem('gyesanjungiji-calc-zone') : 'one';
   const cloud = window.CloudRoster;
   function mergeSharedRoster(serverMembers) {
     // Do not synchronize local per-user calculations, active flags or fight presets.
@@ -61,7 +176,7 @@
       const previous=oldById.get(remote.id)||oldByName.get(String(remote.name).toLocaleLowerCase());
       const m=previous?{...previous,region:{...previous.region},boss:{...previous.boss},strike:{...previous.strike}}:member(String(remote.name),false);
       m.id=String(remote.id);m.name=String(remote.name);m.bonus=clamp(remote.bonus,1e6);
-      m.minScore=clamp(remote.minScore);m.profileRevision=Number(remote.profileRevision)||1;
+      m.minScore=clamp(remote.minScore);m.group=[1,2,3,4].includes(Number(remote.group))?Number(remote.group):0;m.profileRevision=Number(remote.profileRevision)||1;
       for(const r of REGIONS)m.region[r.key]=clamp(remote.region?.[r.key],1e6);
       return m;
     });
@@ -69,12 +184,13 @@
     save();
     if(currentTab==='calc')renderCalc();
     if(currentTab==='members')renderManagement();
+    if(window.ZoneOneUI)window.ZoneOneUI.render();
   }
   function updatePermissions() {
     const readOnly=cloud.sharedMode()&&!cloud.canEdit();
     const add=$('addMember');if(add)add.disabled=readOnly;
     document.querySelectorAll('[data-delete-id],[data-manage="name"],[data-manage="bonus"],[data-manage="minScore"],'+
-      '[data-manage="pirate"],[data-manage="cat"],[data-manage="wolf"],[data-manage="food"],'+
+      '[data-manage="pirate"],[data-manage="cat"],[data-manage="wolf"],[data-manage="food"],[data-manage="group"],'+
       '[data-field="bonus"],[data-field="region"]').forEach(el=>el.disabled=readOnly);
   }
   function refreshVisible() {if(currentTab==='calc')renderCalc();if(currentTab==='members')renderManagement();}
@@ -120,23 +236,41 @@
   function save() {
     try { localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
     catch { notify('자동 저장에 실패했습니다. 저장 공간을 확인해 주세요.'); }
+    document.dispatchEvent(new Event('guild:updated'));
   }
   const activeMembers = () => state.members.filter(m => m.active);
   function changeTab(tab) {
     currentTab = tab;
-    for (const name of ['calc','members','data']) {
+    for (const name of ['home','calc','members','data']) {
       $(name+'Tab').hidden = name!==tab;
       document.querySelector(`[data-tab="${name}"]`).setAttribute('aria-selected',name===tab?'true':'false');
     }
-    if(tab==='calc') renderCalc();
+    if(tab==='calc') {renderCalc();selectCalcZone(calcZone);}
     if(tab==='members') renderManagement();
     if(tab==='data') renderRemaining();
     updatePermissions();
     window.scrollTo(0,0);
   }
+  function selectCalcZone(zone) {
+    calcZone=['one','two','strike'].includes(zone)?zone:'one';
+    localStorage.setItem('gyesanjungiji-calc-zone',calcZone);
+    $('zoneOnePanel').hidden=calcZone!=='one';
+    $('zoneTwoPanel').hidden=calcZone==='one';
+    document.querySelectorAll('[data-calc-zone]').forEach(b=>{
+      const on=b.dataset.calcZone===calcZone;
+      b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));
+    });
+    if(calcZone!=='one'){
+      state.mode=calcZone==='strike'?'strike':'boss';
+      save();renderCalc();
+    }else if(window.ZoneOneUI)window.ZoneOneUI.render();
+  }
   function initControls() {
     $('bossPresets').innerHTML = BOSSES.map(b=>`<button class="pill" data-boss-hp="${b.hp}">${b.name}</button>`).join('');
     document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click',()=>changeTab(btn.dataset.tab)));
+    document.querySelectorAll('[data-open-tab]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.openZone)calcZone=btn.dataset.openZone;changeTab(btn.dataset.openTab)}));
+    document.querySelectorAll('[data-calc-zone]').forEach(btn=>btn.addEventListener('click',()=>selectCalcZone(btn.dataset.calcZone)));
+    document.querySelectorAll('[data-filter-group]').forEach(btn=>btn.addEventListener('click',()=>{memberFilter=btn.dataset.filterGroup;renderManagement()}));
     $('bossMode').addEventListener('click',()=>{state.mode='boss';save();renderCalc()});
     $('strikeMode').addEventListener('click',()=>{state.mode='strike';save();renderCalc()});
     $('bossHp').addEventListener('input',e=>{state.bossHp = Math.max(1,clamp(e.target.value));save();updateOutputs()});
@@ -163,7 +297,7 @@
     ['remainingMin','remainingSec','targetMin','targetSec'].forEach(id=>$(id).addEventListener('input',renderRemaining));
     $('copySummary').addEventListener('click',copySummary);
     $('exportButton').addEventListener('click',exportJson);
-    $('showBackup').addEventListener('click',()=>{const area=$('backupArea');area.hidden=!area.hidden;if(!area.hidden){$('backupText').value=JSON.stringify(state,null,2);$('backupText').select()}});
+    $('showBackup').addEventListener('click',()=>{const area=$('backupArea');area.hidden=!area.hidden;if(!area.hidden){$('backupText').value=JSON.stringify({...state,zoneOne:JSON.parse(localStorage.getItem('gyesanjungiji-zone1-v1')||'null')},null,2);$('backupText').select()}});
     $('importFile').addEventListener('change',importJson);
     $('resetButton').addEventListener('click',()=>{
       if(cloud.sharedMode()){
@@ -171,12 +305,13 @@
         state.members.forEach((m,i)=>{m.active=i<3;m.boss={mode:'ratio',ratio:i<3?(i===0?33.34:33.33):0,time:500};m.strike={mode:'time',time:500,score:0};});
         state.mode='boss';state.bossHp=500000;state.speed=2;state.serverBonus=0;state.region='pirate';
       }else {
-        if(!confirm('길드원과 격추 데이터를 모두 초기화할까요?'))return;state=defaults();
+        if(!confirm('모든 길드원과 격추 데이터를 삭제하고 빈 목록으로 초기화할까요?'))return;state=defaults();
       }
       save();notify('이 기기의 설정을 초기화했습니다.');changeTab('calc');
     });
     cloud.init({acceptRoster:mergeSharedRoster,notify,rerender:refreshVisible,updatePermissions});
     renderCalc();
+    changeTab('home');
   }
   function renderCalc() {
     const boss=state.mode==='boss';
@@ -292,14 +427,17 @@
   }
   function renderManagement() {
     $('totalMembers').textContent=`전체 ${state.members.length}명`;
-    $('manageMembers').innerHTML=`<div class="manage-grid">${state.members.map(m=>`
+    document.querySelectorAll('[data-filter-group]').forEach(btn=>btn.classList.toggle('active',btn.dataset.filterGroup===memberFilter));
+    const visibleMembers=state.members.filter(m=>memberFilter==='all'||String(m.group||0)===memberFilter);
+    $('manageMembers').innerHTML=visibleMembers.length ? `<div class="manage-grid">${visibleMembers.map(m=>`
     <div class="manage-member" data-manage-id="${m.id}"><div class="manage-name"><strong>${escapeHtml(m.name)}</strong><button class="danger" data-delete-id="${m.id}" aria-label="${escapeHtml(m.name)} 삭제">삭제</button></div>
     <div class="member-selector"><input type="checkbox" id="active-${m.id}" data-id="${m.id}" data-manage="active" ${m.active?'checked':''}><label for="active-${m.id}">계산에 참여</label></div>
-    <div class="field"><label>길드원 이름</label><input data-id="${m.id}" data-manage="name" maxlength="30" type="text" value="${escapeHtml(m.name)}"></div>
+    <div class="grid"><div class="field"><label>길드원 이름</label><input data-id="${m.id}" data-manage="name" maxlength="30" type="text" value="${escapeHtml(m.name)}"></div>
+    <div class="field"><label>소속 군</label><select data-id="${m.id}" data-manage="group">${[0,1,2,3,4].map(g=>`<option value="${g}" ${Number(m.group)===g?'selected':''}>${g?g+'군':'미지정'}</option>`).join('')}</select></div></div>
     <div class="grid" style="margin-top:9px"><div class="field"><label>기본 격추 (%)</label><input data-id="${m.id}" data-manage="bonus" type="number" min="0" step="0.01" value="${m.bonus}"></div>
     <div class="field"><label>최소 점수 증가</label><input data-id="${m.id}" data-manage="minScore" type="number" min="0" step="1" value="${m.minScore}"></div></div>
     <div class="grid" style="margin-top:9px">${REGIONS.map(r=>`<div class="field"><label>${r.name} 지역 격추 (%)</label><input data-id="${m.id}" data-manage="${r.key}" type="number" min="0" step="0.01" value="${m.region[r.key]}"></div>`).join('')}</div>
-    </div>`).join('')}</div>`;
+    </div>`).join('')}</div>` : '<p class="note">이 군에 길드원이 없습니다. 위에서 새 길드원을 추가하거나 군을 변경하세요.</p>';
     updatePermissions();
   }
   function addMember() {
@@ -308,12 +446,12 @@
     if(state.members.some(m=>m.name.toLowerCase()===name.toLowerCase())){notify('이미 등록된 닉네임입니다.');return;}
     if(state.members.length>=200){notify('최대 200명까지 등록할 수 있습니다.');return;}
     if(cloud.sharedMode()){
-      cloud.mutate({type:'add',name,bonus:clamp($('newBonus').value,1e6)}).then(ok=>{
-        if(ok){$('newName').value='';$('newBonus').value=0;renderManagement();}
+      cloud.mutate({type:'add',name,bonus:clamp($('newBonus').value,1e6),group:Number($('newGroup').value)||0}).then(ok=>{
+        if(ok){$('newName').value='';$('newBonus').value=0;$('newGroup').value='0';renderManagement();}
       });return;
     }
-    const m=member(name,false);m.bonus=clamp($('newBonus').value,1e6);
-    state.members.push(m);$('newName').value='';$('newBonus').value=0;save();renderManagement();notify(`${name} 추가 완료 · 계산 탭에서 참여를 선택하세요.`);
+    const m=member(name,false);m.bonus=clamp($('newBonus').value,1e6);m.group=Number($('newGroup').value)||0;
+    state.members.push(m);$('newName').value='';$('newBonus').value=0;$('newGroup').value='0';save();renderManagement();notify(`${name} 추가 완료 · 계산 탭에서 참여를 선택하세요.`);
   }
   function onManageInput(e) {
     const input=e.target.closest('[data-manage]');if(!input)return;
@@ -327,7 +465,7 @@
         if(!value||value.length>30||state.members.some(x=>x.id!==m.id&&x.name.toLocaleLowerCase()===value.toLocaleLowerCase())){
           notify('빈 이름 또는 중복된 이름은 사용할 수 없습니다.');input.value=m.name;return;
         }
-      }else value=clamp(input.value,field==='minScore'?1e9:1e6);
+      }else value=field==='group'?Number(input.value):clamp(input.value,field==='minScore'?1e9:1e6);
       cloud.mutate({type:'update',id:m.id,expectedRevision:m.profileRevision,field,value});return;
     }
     if(field==='name') {
@@ -339,6 +477,7 @@
       m.name=name;save();renderManagement();return;
     }
     if(field==='active')m.active=input.checked;
+    else if(field==='group'){m.group=[0,1,2,3,4].includes(Number(input.value))?Number(input.value):0;save();renderManagement();return;}
     else if(field==='bonus'||field==='minScore')m[field]=clamp(input.value,field==='bonus'?1e6:1e9);
     else if(REGIONS.some(r=>r.key===field))m.region[field]=clamp(input.value,1e6);
     save();
@@ -365,7 +504,8 @@
     try{document.execCommand('copy');notify('계산 결과를 복사했습니다.')}catch{notify('이 기기에서는 복사가 지원되지 않습니다.')};ta.remove();
   }
   function exportJson() {
-    const payload=JSON.stringify(state,null,2);
+    const withZoneOne={...state,zoneOne:JSON.parse(localStorage.getItem('gyesanjungiji-zone1-v1')||'null')};
+    const payload=JSON.stringify(withZoneOne,null,2);
     if(window.Android && typeof window.Android.saveJson==='function') {window.Android.saveJson(payload);return;}
     const blob=new Blob([payload],{type:'application/json;charset=utf-8'});
     const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='gyesanjungiji-backup.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
@@ -375,14 +515,193 @@
     const file=e.target.files&&e.target.files[0];if(!file)return;
     try{
       if(file.size>4*1024*1024) throw new Error('백업 파일이 너무 큽니다.');
-      const content=await file.text(); const imported=sanitize(JSON.parse(content));
+      const content=await file.text();const raw=JSON.parse(content);const imported=sanitize(raw);
       if(cloud.sharedMode())throw new Error('공용 연결 중에는 데이터 복원을 사용할 수 없습니다. 공용 연결을 해제한 뒤 복원하세요.');
       if(!confirm(`${imported.members.length}명의 백업으로 현재 데이터를 교체할까요?`))return;
-      state=imported;save();notify('백업을 복원했습니다.');changeTab('calc');
+      state=imported;save();
+      if(raw.zoneOne&&typeof raw.zoneOne==='object'&&Array.isArray(raw.zoneOne.rewards)&&raw.zoneOne.monsters&&typeof raw.zoneOne.monsters==='object'){
+        localStorage.setItem('gyesanjungiji-zone1-v1',JSON.stringify(raw.zoneOne));
+      }
+      notify('백업을 복원했습니다. 화면을 새로고침합니다.');window.location.reload();
     } catch(error){notify('복원 실패: '+(error.message||'백업을 확인하세요.'))}
     finally{e.target.value=''}
   }
+  window.guildRosterSnapshot=()=>state.members.map(m=>({id:m.id,name:m.name,group:m.group||0,bonus:m.bonus}));
   window.appExportDone=success=>notify(success?'백업 파일을 저장했습니다.':'백업 저장이 취소되었거나 실패했습니다.');
   initBackgroundParticles();
   initControls();
+  // External JS avoids the CSP inline-script restriction and enables offline PWA caching.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  }
+})();
+
+
+/* Zone 1 UI */
+'use strict';
+(()=>{
+  const Engine=window.ZoneOneEngine;
+  const $=id=>document.getElementById(id);
+  const STORE='gyesanjungiji-zone1-v1';
+  const fmt=n=>Number(n).toLocaleString('ko-KR',{maximumFractionDigits:2});
+  const pct=n=>`${Number(n).toFixed(2)}%`;
+  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const asNumber=(v,max=1e9)=>Number.isFinite(Number(v))?Math.max(0,Math.min(max,Number(v))):0;
+  const makeStore=()=>({monster:Engine.MONSTERS[0],monsters:{},options:{inputMode:'final',speed:1,serverBonus:0,lossPerKnock:0},rewards:[],lastDraw:null});
+  let data;
+  try {
+    data=JSON.parse(localStorage.getItem(STORE));
+    if(!data||typeof data!=='object'||!data.monsters||!Array.isArray(data.rewards))throw Error('bad');
+  }catch {data=makeStore();}
+  if(!Engine.MONSTERS.includes(data.monster))data.monster=Engine.MONSTERS[0];
+  data.options=data.options||makeStore().options;
+  if(!['raw','final'].includes(data.options.inputMode))data.options.inputMode='final';
+  data.rewards=data.rewards.filter(x=>x&&typeof x.name==='string'&&Number.isSafeInteger(x.quantity)&&x.quantity>=1&&Number(x.value)>0);
+  const save=()=>{try{localStorage.setItem(STORE,JSON.stringify(data));}catch{message('저장 공간이 부족해 기여도를 보존하지 못했습니다.');}};
+  let cooldown;
+  function message(text){
+    const toast=$('toast');if(!toast)return;
+    toast.textContent=text;toast.hidden=false;clearTimeout(cooldown);cooldown=setTimeout(()=>toast.hidden=true,3500);
+  }
+  function current(){
+    if(!data.monsters[data.monster])data.monsters[data.monster]={hp:0,entries:{}};
+    return data.monsters[data.monster];
+  }
+  function roster(){return typeof window.guildRosterSnapshot==='function'?window.guildRosterSnapshot():[];}
+  function calculation(){
+    const boss=current();
+    const people=roster().map(m=>{
+      const stored=boss.entries[m.id]||{};
+      return {...m,raw:asNumber(stored.raw,100),knocks:Math.floor(asNumber(stored.knocks,100))};
+    });
+    return Engine.calculate(people,data.options);
+  }
+  function clearDraw(){data.lastDraw=null;$('zoneOneResults').innerHTML='';}
+  function renderMonsters(){
+    $('monsterChoices').innerHTML=Engine.MONSTERS.map((m,i)=>`<button class="pill monster-chip ${m===data.monster?'active':''}" data-monster="${esc(m)}" aria-pressed="${m===data.monster}">${['🐭','🐝','🦀','🐇'][i]}<span>${esc(m)}</span></button>`).join('');
+  }
+  function renderMembers(){
+    const people=roster();
+    if(!people.length){
+      $('zoneOneMembers').innerHTML='<div class="empty-zone"><img src="assets/note-hamster.png" alt="" loading="lazy"><p>길드원이 아직 없어요.<br>길드원 관리에서 이름과 군을 등록해 주세요.</p></div>';
+      updateTotals();return;
+    }
+    const entries=current().entries;
+    $('zoneOneMembers').innerHTML=`<div class="zone-member-list">${people.map(m=>{
+      const stored=entries[m.id]||{};
+      const group=m.group?`${m.group}군`:'미지정';
+      return `<div class="zone-member" data-zone-member="${esc(m.id)}"><div class="zone-member-info"><strong>${esc(m.name)}</strong><span class="group-badge group-${m.group||0}">${group}</span></div>
+      <div class="zone-member-fields"><label>기여도 (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-zone-field="raw" data-member-id="${esc(m.id)}" value="${asNumber(stored.raw,100)}"></label>
+      <label>격추 횟수<input type="number" min="0" max="100" step="1" inputmode="numeric" data-zone-field="knocks" data-member-id="${esc(m.id)}" value="${Math.floor(asNumber(stored.knocks,100))}"></label></div></div>`;
+    }).join('')}</div>`;
+    updateTotals();
+  }
+  function updateTotals(){
+    const c=calculation(),hp=asNumber(current().hp),hasRoster=roster().length>0;
+    const sumText=c.overCap?'<div class="msg">보정된 길드원 기여도 합계가 100%를 초과했습니다. 추첨 전 수치를 확인해 주세요.</div>':'';
+    const remaining=c.overCap?'100% 초과':pct(c.remaining);
+    $('zoneOneTotals').innerHTML=`<div class="zone-summary-grid"><div><small>길드 기여도 합계</small><strong>${pct(c.total)}</strong></div><div><small>외부·미입력 기여도</small><strong>${remaining}</strong></div><div><small>길드 기여 HP</small><strong>${hp>0?fmt(hp*c.total/100):'최대 HP 미입력'}</strong></div></div>${sumText}${hasRoster?'<p class="hint">길드원 합계가 100% 미만인 것은 정상입니다. 미지정 군은 기여율에는 포함되지만 보상 추첨 대상에서는 제외됩니다.</p>':''}`;
+  }
+  function renderRewardList(){
+    if(!data.rewards.length){$('rewardList').innerHTML='<p class="note">획득한 보상이 아직 없습니다. 이름과 수량·가치를 등록하세요.</p>';return;}
+    $('rewardList').innerHTML=`<div class="reward-list">${data.rewards.map((r,i)=>`<div class="reward-entry"><span><strong>${esc(r.name)}</strong><small> ${fmt(r.quantity)}개 · 개당 가치 ${fmt(r.value)}</small></span><button class="danger small" data-delete-reward="${i}" aria-label="${esc(r.name)} 제거">삭제</button></div>`).join('')}</div>`;
+  }
+  function renderResult(){
+    const r=data.lastDraw;
+    if(!r){$('zoneOneResults').innerHTML='';return;}
+    const groupRows=[1,2,3,4].map(g=>{
+      const s=r.groupStats[g];
+      return `<tr><td>${g}군</td><td>${Engine.SHARES[g]}%</td><td>${s.assigned}개</td><td>${s.distributed}개</td><td>${s.held}개</td><td>${fmt(s.value)}</td></tr>`;
+    }).join('');
+    const peopleRows=r.people.filter(m=>m.wonCount>0).sort((a,b)=>a.group-b.group||b.wonValue-a.wonValue).map(m=>{
+      const summary=m.won.map(x=>`${x.name} (${fmt(x.value)})`).join(', ');
+      return `<tr><td>${m.group}군</td><td>${esc(m.name)}</td><td>${pct(m.effective)}</td><td>${m.wonCount}</td><td>${fmt(m.wonValue)}</td><td class="item-list">${esc(summary)}</td></tr>`;
+    }).join('');
+    $('zoneOneResults').innerHTML=`<div class="draw-result"><h3>추첨 결과</h3><p class="note">총 ${r.totalCount}개 · 총 가치 ${fmt(r.totalValue)} · 실제 지급 ${r.rewards.length}개 · 보류 ${r.held.length}개</p>
+    <h3>1차 군별 할당</h3><div class="table-scroll"><table class="reward-table"><thead><tr><th>군</th><th>목표 비율</th><th>할당</th><th>지급</th><th>보류</th><th>할당 가치</th></tr></thead><tbody>${groupRows}</tbody></table></div>
+    <h3>2차 개인별 추첨</h3><div class="table-scroll"><table class="reward-table"><thead><tr><th>군</th><th>길드원</th><th>유효 기여율</th><th>개수</th><th>합계 가치</th><th>보상 내역</th></tr></thead><tbody>${peopleRows||'<tr><td colspan="6">지급된 보상이 없습니다.</td></tr>'}</tbody></table></div>
+    ${r.held.length?`<div class="msg">참여 기여도가 있는 길드원이 없는 군에 배정된 보상 ${r.held.length}개는 보류했어요. 다른 군으로 임의 재배분하지 않습니다.</div>`:''}
+    <p class="hint">무작위 추첨 특성상 다시 추첨하면 결과가 바뀝니다. 지급 확정 전 결과를 복사해 두세요.</p><button class="secondary full-width" id="copyZoneOneResult">추첨 결과 복사</button></div>`;
+  }
+  function render(){
+    if(!$('zoneOnePanel'))return;
+    renderMonsters();
+    const boss=current();
+    $('zoneOneHp').value=boss.hp||'';
+    $('zoneOneInputMode').value=data.options.inputMode;
+    $('zoneOneSpeed').value=String(data.options.speed===2?2:1);
+    $('zoneOneServerBonus').value=asNumber(data.options.serverBonus,1e6);
+    $('zoneOneKnockLoss').value=asNumber(data.options.lossPerKnock,100);
+    renderMembers();renderRewardList();renderResult();
+  }
+  function addReward(){
+    const name=$('newRewardName').value.trim();
+    const quantity=Number($('newRewardQuantity').value),value=Number($('newRewardValue').value);
+    if(!name||name.length>40||!Number.isSafeInteger(quantity)||quantity<1||quantity>2000||!Number.isFinite(value)||value<=0||value>1e9){message('보상 이름·수량(1~2000)·가치(0 초과)를 확인하세요.');return;}
+    if(data.rewards.reduce((sum,x)=>sum+x.quantity,0)+quantity>2000){message('전체 보상 수량은 한 번에 2000개까지 가능해요.');return;}
+    data.rewards.push({id:`r${Date.now().toString(36)}${data.rewards.length}`,name,quantity,value});
+    $('newRewardName').value='';$('newRewardQuantity').value='1';$('newRewardValue').value='1';
+    clearDraw();save();renderRewardList();
+  }
+  async function copyResult(){
+    const r=data.lastDraw;if(!r)return;
+    const lines=[`상층 1구역 ${data.monster} 보상 추첨`, `총 ${r.totalCount}개 · 총 가치 ${fmt(r.totalValue)}`];
+    for(let g=1;g<=4;g++){lines.push(`${g}군 (${Engine.SHARES[g]}%): 할당 ${r.groupStats[g].assigned} / 지급 ${r.groupStats[g].distributed} / 보류 ${r.groupStats[g].held}`);}
+    for(const m of r.people.filter(m=>m.wonCount>0))lines.push(`${m.group}군 ${m.name}: ${m.won.map(x=>x.name).join(', ')} / 가치 ${fmt(m.wonValue)}`);
+    if(r.held.length)lines.push(`보류 ${r.held.length}개`);
+    try{await navigator.clipboard.writeText(lines.join('\n'));message('추첨 결과를 복사했어요.');}
+    catch {message('복사에 실패했습니다. 브라우저 권한을 확인해 주세요.');}
+  }
+  function init(){
+    if(!$('zoneOnePanel'))return;
+    $('monsterChoices').addEventListener('click',e=>{
+      const target=e.target.closest('[data-monster]');if(!target)return;
+      if(!Engine.MONSTERS.includes(target.dataset.monster))return;
+      data.monster=target.dataset.monster;save();render();
+    });
+    $('zoneOneHp').addEventListener('input',e=>{current().hp=asNumber(e.target.value,1e15);clearDraw();save();updateTotals();});
+    for(const [id,field,max] of [['zoneOneInputMode','inputMode',0],['zoneOneSpeed','speed',2],['zoneOneServerBonus','serverBonus',1e6],['zoneOneKnockLoss','lossPerKnock',100]]){
+      $(id).addEventListener('change',e=>{
+        data.options[field]=field==='inputMode'?(e.target.value==='raw'?'raw':'final'):(field==='speed'?(Number(e.target.value)===2?2:1):asNumber(e.target.value,max));
+        clearDraw();save();updateTotals();
+      });
+    }
+    $('zoneOneMembers').addEventListener('input',e=>{
+      const input=e.target.closest('[data-zone-field]');if(!input)return;
+      const id=input.dataset.memberId;
+      if(!roster().some(m=>m.id===id))return;
+      const entry=current().entries[id]||(current().entries[id]={raw:0,knocks:0});
+      entry[input.dataset.zoneField]=input.dataset.zoneField==='knocks'?Math.floor(asNumber(input.value,100)):asNumber(input.value,100);
+      clearDraw();save();updateTotals();
+    });
+    $('addReward').addEventListener('click',addReward);
+    $('rewardList').addEventListener('click',e=>{
+      const button=e.target.closest('[data-delete-reward]');if(!button)return;
+      const idx=Number(button.dataset.deleteReward);
+      if(!Number.isSafeInteger(idx)||idx<0||idx>=data.rewards.length)return;
+      data.rewards.splice(idx,1);clearDraw();save();renderRewardList();
+    });
+    $('drawZoneOne').addEventListener('click',()=>{
+      const calc=calculation();
+      if(calc.overCap){message('총 기여율이 100%를 넘어 추첨을 중단했어요.');return;}
+      if(!calc.people.some(x=>x.effective>0&&x.group>=1&&x.group<=4)){message('기여도가 있고 1~4군에 소속된 길드원이 필요해요.');return;}
+      if(!data.rewards.length){message('획득한 보상을 먼저 등록해 주세요.');return;}
+      try{
+        const raw=Engine.draw({members:calc.people,items:data.rewards},()=>{
+          if(window.crypto&&window.crypto.getRandomValues){const arr=new Uint32Array(1);window.crypto.getRandomValues(arr);return arr[0]/4294967296;}
+          return Math.random();
+        });
+        data.lastDraw={...raw,monster:data.monster,createdAt:new Date().toISOString()};save();renderResult();message('2단계 보상 추첨을 완료했어요.');
+      }catch(error){message(error.message||'추첨 실패');}
+    });
+    $('zoneOneResults').addEventListener('click',e=>{if(e.target.closest('#copyZoneOneResult'))copyResult();});
+    document.addEventListener('guild:updated',()=>{
+      // Re-render only when roster changes, not on contribution keystrokes.
+      if(data.lastDraw){data.lastDraw=null;save();}
+      renderMembers();renderResult();
+    });
+    render();
+  }
+  window.ZoneOneUI={render,init};
+  init();
 })();

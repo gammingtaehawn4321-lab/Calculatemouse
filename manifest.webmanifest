@@ -1,7 +1,7 @@
 {
   "name": "계산중이쥐",
   "short_name": "계산중이쥐",
-  "description": "공용 길드 격추 및 보스 계산기",
+  "description": "상층 1·2구역 기여도, 보상 추첨, 군별 길드원 관리",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

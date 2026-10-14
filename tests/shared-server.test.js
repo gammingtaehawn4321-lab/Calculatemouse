@@ -23,12 +23,14 @@ r=ctx.mutate('id',{type:'update',id:'mtestone',field:'bonus',value:99,expectedRe
 assert.equal(r.error,'CONFLICT');assert.equal(db[0][2],44);
 r=ctx.mutate('id',{type:'update',id:'mtesttwo',field:'cat',value:70,expectedRevision:1});
 assert(r.ok);assert.equal(db[1][5],70);assert.equal(revision,3);
-r=ctx.mutate('id',{type:'add',name:'셋째',bonus:1});
-assert(r.ok);assert.equal(db.length,3);assert.equal(db[2][1],'셋째');
+r=ctx.mutate('id',{type:'add',name:'셋째',bonus:1,group:3});
+assert(r.ok);assert.equal(db.length,3);assert.equal(db[2][1],'셋째');assert.equal(db[2][9],3);assert.equal(r.members[2].group,3);
 r=ctx.mutate('id',{type:'add',name:'첫째',bonus:0});
 assert.equal(r.error,'DUPLICATE');assert.equal(db.length,3);
 assert.throws(()=>ctx.mutate('id',{type:'update',id:'mtestone',field:'bonus',value:-5,expectedRevision:2}),/Invalid numeric value/);
 assert.equal(db[0][2],44);
+r=ctx.mutate('id',{type:'update',id:'mtesttwo',field:'group',value:4,expectedRevision:2});
+assert(r.ok);assert.equal(db[1][9],4);
 r=ctx.mutate('id',{type:'delete',id:'mtestone',expectedRevision:2});
 assert(r.ok);assert.equal(db.length,2);
 r=ctx.mutate('id',{type:'delete',id:'mtestone',expectedRevision:2});

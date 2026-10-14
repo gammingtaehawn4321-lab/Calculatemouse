@@ -4,14 +4,60 @@
 <meta name="theme-color" content="#180927"><meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.workers.dev https://script.google.com https://script.googleusercontent.com; frame-src 'none'; object-src 'none'; base-uri 'self'">
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon-192.png"><title>계산중이쥐 · 공용 길드 계산기</title><link rel="stylesheet" href="styles.css"></head>
 <body><main>
-<header><h1>계산중이쥐</h1><p class="sub">모바일 상층 보스 · 일격 계산기</p><div class="hint" id="topCloudStatus" role="status">기기 내부 저장</div></header>
+<header class="compact-brand"><span class="brand-dot">✦</span><strong>계산중이쥐</strong><span class="hint" id="topCloudStatus" role="status">기기 내부 저장</span></header>
 <nav class="tabs" role="tablist" aria-label="화면 선택">
-<button class="tab" data-tab="calc" role="tab" aria-selected="true">계산</button>
-<button class="tab" data-tab="members" role="tab" aria-selected="false">길드원 관리</button>
-<button class="tab" data-tab="data" role="tab" aria-selected="false">데이터 · 도구</button>
+<button class="tab" data-tab="home" role="tab" aria-selected="true">홈</button>
+<button class="tab" data-tab="calc" role="tab" aria-selected="false">계산</button>
+<button class="tab" data-tab="members" role="tab" aria-selected="false">길드원</button>
+<button class="tab" data-tab="data" role="tab" aria-selected="false">설정</button>
 </nav>
-<section id="calcTab" role="tabpanel">
-<div class="card"><div class="pill-group" role="group" aria-label="계산 모드"><button id="bossMode" class="pill active">상층 보스</button><button id="strikeMode" class="pill">일격 점수</button></div>
+<section id="homeTab" class="home-screen" role="tabpanel">
+  <div class="home-hero">
+    <div class="hero-glow"></div>
+    <img class="hero-emblem" src="assets/main-emblem.svg" alt="계산중이쥐 햄스터 계산기 문장" width="280" height="280" fetchpriority="high">
+    <h1>계산중이쥐</h1>
+    <p class="home-tagline">귀여운 계산이, 더 특별한 일상을 만든다</p>
+  </div>
+  <button class="home-action home-action-primary" data-open-tab="calc" data-open-zone="one">
+    <img src="assets/note-hamster.png" alt="" loading="lazy"><span><strong>계산하기</strong><small>상층 1구역 · 2구역 · 일격 점수</small></span><b aria-hidden="true">›</b>
+  </button>
+  <div class="home-actions-grid">
+    <button class="home-action" data-open-tab="members"><img src="assets/glass-hamster.png" alt="" loading="lazy"><span><strong>길드원 관리</strong><small>1~4군 편성 및 격추 관리</small></span></button>
+    <button class="home-action" data-open-tab="calc" data-open-zone="one"><img src="assets/wheel-hamster.png" alt="" loading="lazy"><span><strong>보상 추첨</strong><small>기여도 기반 2차 추첨</small></span></button>
+  </div>
+  <div class="home-footer card"><img src="assets/snack-hamster.png" alt="" loading="lazy"><p>오늘도 계산은 착착!<br><span class="muted">길드원 등록부터 시작해 봐요.</span></p></div>
+</section>
+<section id="calcTab" role="tabpanel" hidden>
+<div class="zone-switch pill-group" role="group" aria-label="계산할 구역">
+  <button class="pill active" data-calc-zone="one" aria-pressed="true">상층 1구역</button>
+  <button class="pill" data-calc-zone="two" aria-pressed="false">상층 2구역</button>
+  <button class="pill" data-calc-zone="strike" aria-pressed="false">일격 점수</button>
+</div>
+<section id="zoneOnePanel" aria-label="상층 1구역 계산">
+<div class="card zone-intro"><h2>상층 1구역 · 기여도 계산</h2><p class="note">몬스터 최대 HP에 대한 개인별 기여율을 입력하세요. 외부 참가자가 있으므로 길드 합계가 100%보다 작아도 정상입니다.</p>
+<div id="monsterChoices" class="monster-choices" role="group" aria-label="1구역 몬스터"></div>
+<div class="grid"><div class="field"><label for="zoneOneHp">몬스터 최대 체력 (HP)</label><input id="zoneOneHp" type="number" value="0" min="0" step="1" inputmode="numeric" placeholder="최대 HP 입력"></div>
+<div class="field"><label for="zoneOneInputMode">입력한 기여도 기준</label><select id="zoneOneInputMode"><option value="final">게임에 표시된 최종 %</option><option value="raw">보정 전 기본 %</option></select></div>
+<div class="field"><label for="zoneOneSpeed">배속</label><select id="zoneOneSpeed"><option value="1">1배속</option><option value="2">2배속 (4.29% 손실)</option></select></div>
+<div class="field"><label for="zoneOneServerBonus">서버 격추 보너스 (%)</label><input id="zoneOneServerBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"></div>
+<div class="field"><label for="zoneOneKnockLoss">격추 1회당 점수 손실 (%)</label><input id="zoneOneKnockLoss" type="number" value="0" min="0" max="100" step="0.01" inputmode="decimal"></div></div>
+<p class="hint">최종 %를 입력했다면 손실·격추 보너스를 중복 적용하지 않습니다. 보정 전 %를 입력할 때만 설정한 보너스·배속·격추 손실을 반영합니다. 격추 1회당 손실률은 실제 게임값으로 직접 설정하세요.</p>
+</div>
+<div class="card"><div class="section-heading"><h2>길드원 참여 기여도</h2><button class="secondary small" data-open-tab="members">군 편성</button></div>
+<div id="zoneOneMembers"></div><div id="zoneOneTotals" class="result-block" aria-live="polite"></div></div>
+<div class="card"><h2>군별 1차 할당</h2><div class="group-quota-grid"><div><strong>1군</strong><b>30%</b></div><div><strong>2군</strong><b>25%</b></div><div><strong>3군</strong><b>25%</b></div><div><strong>4군</strong><b>20%</b></div></div>
+<p class="hint">획득한 보상 총 수량을 군별로 30·25·25·20%에 가깝게 정수 할당합니다. 보상 종류마다 가치가 다르면 실제 군별 총가치는 달라질 수 있습니다.</p></div>
+<div class="card"><h2>획득 보상 입력</h2><div class="reward-input-grid"><div class="field"><label for="newRewardName">보상 이름</label><input type="text" id="newRewardName" maxlength="40" placeholder="보상 이름"></div>
+<div class="field"><label for="newRewardQuantity">획득 수량</label><input type="number" id="newRewardQuantity" min="1" max="2000" step="1" value="1"></div>
+<div class="field"><label for="newRewardValue">개당 가치 (상대값)</label><input type="number" id="newRewardValue" min="0.01" step="0.01" value="1"></div></div>
+<div class="actions"><button id="addReward" class="secondary">보상 추가</button></div><div id="rewardList"></div>
+<p class="hint">보상 가치는 직접 설정합니다. 가치가 큰 보상일수록 2차 추첨에서 높은 기여도를 더 크게 반영합니다.</p>
+<button id="drawZoneOne" class="primary full-width">군별 분배 및 2차 추첨 실행</button>
+<div id="zoneOneResults" aria-live="polite"></div></div>
+</section>
+<div id="zoneTwoPanel" hidden>
+
+<div class="card"><div class="pill-group" role="group" aria-label="계산 모드" hidden><button id="bossMode" class="pill active">상층 보스</button><button id="strikeMode" class="pill">일격 점수</button></div>
 <p class="hint">기존 사이트의 보정식(기본 654, 170초, 2배속 손실 4.29%)을 사용합니다.</p>
 <div id="bossControls"><div class="field"><label for="bossHp">보스 총 HP</label><input id="bossHp" type="number" min="1" step="1" inputmode="numeric"></div>
 <div id="bossPresets" class="pill-group" style="margin-top:9px"></div></div>
@@ -22,19 +68,20 @@
 <div class="card"><div class="section-heading"><h2>참여 인원 <span id="activeCount" class="gold"></span></h2><button id="manageJump" class="secondary small">길드원 추가·수정</button></div>
 <div id="memberToggles" class="pill-group"></div>
 <div id="autoActions" class="actions"><button class="secondary" id="equalRatio">비율 균등 배분</button><button class="secondary" id="bonusRatio">격추 비례 배분</button><button class="primary" id="equalTime">시간 맞추기</button></div>
-<div id="emptyCalc" class="msg" hidden>참여할 길드원을 선택하면 계산 결과가 나옵니다.</div></div>
+<div id="emptyCalc" class="msg" hidden>등록된 길드원이 없다면 길드원 관리에서 추가하세요. 참여할 길드원을 선택하면 계산 결과가 나옵니다.</div></div>
 <div id="calcMemberCards"></div>
 <div class="card"><h2>전체 계산 결과</h2><div class="grid"><div class="stat"><div class="stat-name" id="sumName">총 예상 HP</div><div class="stat-value" id="sumValue">0</div></div><div class="stat"><div class="stat-name" id="ratioName">실제 HP 비율</div><div class="stat-value" id="ratioValue">0%</div></div><div class="stat"><div class="stat-name">평균 소요 시간</div><div class="stat-value" id="averageTime">0초</div></div><div class="stat"><div class="stat-name">참여 인원</div><div class="stat-value" id="sumMembers">0명</div></div></div>
 <div id="calcWarnings" aria-live="polite"></div>
 <div class="actions"><button id="copySummary" class="primary">결과 복사</button></div></div>
+</div>
 </section>
 <section id="membersTab" role="tabpanel" hidden>
-<div class="card"><h2>길드원 추가</h2><div class="grid"><div class="field"><label for="newName">닉네임</label><input id="newName" type="text" maxlength="30" placeholder="새 길드원 이름"></div><div class="field"><label for="newBonus">기본 격추값 (%)</label><input id="newBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"></div></div><button id="addMember" class="primary" style="margin-top:10px;width:100%">길드원 추가하기</button><p class="hint">길드원 수는 15명으로 제한하지 않습니다. 삭제 시 해당 길드원의 저장값도 제거됩니다.</p></div>
-<div class="card"><div class="section-heading"><h2>길드원 목록</h2><span id="totalMembers" class="small muted"></span></div><div id="manageMembers"></div></div>
+<div class="card"><h2>길드원 추가</h2><div class="grid"><div class="field"><label for="newName">닉네임</label><input id="newName" type="text" maxlength="30" placeholder="새 길드원 이름"></div><div class="field"><label for="newBonus">기본 격추값 (%)</label><input id="newBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"></div><div class="field"><label for="newGroup">배치할 군</label><select id="newGroup"><option value="0">미지정</option><option value="1">1군</option><option value="2">2군</option><option value="3">3군</option><option value="4">4군</option></select></div></div><button id="addMember" class="primary" style="margin-top:10px;width:100%">길드원 추가하기</button><p class="hint">길드원 수는 15명으로 제한하지 않습니다. 삭제 시 해당 길드원의 저장값도 제거됩니다.</p></div>
+<div class="card"><div class="pill-group member-filter" role="group" aria-label="길드원 군별 필터"><button data-filter-group="all" class="pill active">전체</button><button data-filter-group="1" class="pill">1군</button><button data-filter-group="2" class="pill">2군</button><button data-filter-group="3" class="pill">3군</button><button data-filter-group="4" class="pill">4군</button><button data-filter-group="0" class="pill">미지정</button></div><div class="section-heading"><h2>길드원 목록</h2><span id="totalMembers" class="small muted"></span></div><div id="manageMembers"></div></div>
 </section>
 <section id="dataTab" role="tabpanel" hidden>
 <div class="card"><div class="section-heading"><h2>공용 길드원 데이터 연결</h2><span class="small muted" id="cloudStatus">기기 내부 저장</span></div>
-<p class="note">길드원 닉네임·기본 격추·최소 점수·지역별 격추를 모든 연결된 기기에서 공유합니다. 참여 인원·배속·보스 계산 조건은 각 기기에 개별 저장됩니다.</p>
+<p class="note">길드원 닉네임·소속 군·기본 격추·최소 점수·지역별 격추를 모든 연결된 기기에서 공유합니다. 참여 인원·배속·보스 계산 조건은 각 기기에 개별 저장됩니다.</p>
 <div class="field"><label for="cloudUrl">공용 서버 주소 (Cloudflare Worker)</label><input type="url" id="cloudUrl" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://your-guild.your-account.workers.dev"></div>
 <div class="grid" style="margin-top:10px"><div class="field"><label for="cloudReadKey">공용 읽기 키 (필수)</label><input id="cloudReadKey" type="password" autocomplete="off" placeholder="읽기용 비밀 키"></div>
 <div class="field"><label for="cloudEditKey">관리자 수정 키 (편집할 기기만)</label><input id="cloudEditKey" type="password" autocomplete="off" placeholder="없으면 읽기 전용"></div></div>
@@ -44,7 +91,7 @@
 </div>
 <div class="card"><h2>남은 시간 계산기</h2><div class="grid"><div class="field"><label for="remainingMin">현재 남은 시간 (분)</label><input id="remainingMin" type="number" min="0" value="0"></div><div class="field"><label for="remainingSec">현재 남은 시간 (초)</label><input id="remainingSec" type="number" min="0" value="0"></div><div class="field"><label for="targetMin">목표 시간 (분)</label><input id="targetMin" type="number" min="0" value="0"></div><div class="field"><label for="targetSec">목표 시간 (초)</label><input id="targetSec" type="number" min="0" value="0"></div></div><div id="remainingOutput" class="result-block"></div></div>
 <div class="card"><h2>데이터 백업 · 복원</h2><p class="note">이 기기의 계산 설정과 마지막 길드원 데이터가 백업됩니다. 공용 모드에서 복원은 제한되며, 서버 데이터는 이 백업으로 덮어쓰지 않습니다.</p><div class="actions"><button id="exportButton" class="primary">JSON 백업 저장</button><button id="showBackup" class="secondary">백업 텍스트 보기</button></div><div id="backupArea" hidden><label for="backupText" class="hint">복사용 백업 데이터</label><textarea id="backupText" readonly></textarea></div><hr class="sep"><label for="importFile" class="hint">JSON 백업 불러오기</label><input id="importFile" type="file" accept="application/json,.json"><p class="hint">복원하면 현재 데이터가 교체됩니다.</p></div>
-<div class="card"><h2>안내</h2><p class="note">이 앱은 원본 공개 계산식을 참조해 별도로 작성한 모바일 버전입니다. 상층 모드에서는 기본 격추값과 서버 격추값만, 일격 모드에서는 선택한 지역의 격추값도 합산합니다.</p><button id="resetButton" class="danger">기본 길드원으로 초기화</button></div>
+<div class="card"><h2>안내</h2><p class="note">이 앱은 원본 공개 계산식을 참조해 별도로 작성한 모바일 버전입니다. 상층 모드에서는 기본 격추값과 서버 격추값만, 일격 모드에서는 선택한 지역의 격추값도 합산합니다.</p><button id="resetButton" class="danger">길드원 목록 초기화</button></div>
 </section>
 </main><div id="toast" class="status" role="status" hidden></div>
-<script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));</script><script src="calc.js"></script><script src="shared.js"></script><script src="app.js"></script></body></html>
+<script src="calc.js"></script><script src="shared.js"></script><script src="app.js"></script></body></html>

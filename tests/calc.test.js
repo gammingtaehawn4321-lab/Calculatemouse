@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const C = require('../app/src/main/assets/calc.js');
+const C = require('../calc.js');
 function approx(a,b, tol=1e-7) { assert(Math.abs(a-b)<tol, `${a} vs ${b}`); }
 approx(C.scorePerSecond(0,170,1), 654*100/60);
 approx(C.scorePerSecond(0,170,2), 654*100/60*(1-0.0429));
