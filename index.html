@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#180927"><meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.workers.dev https://script.google.com https://script.googleusercontent.com; frame-src 'none'; object-src 'none'; base-uri 'self'">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon-192.png"><title>계산중이쥐 · 공용 길드 계산기</title><link rel="stylesheet" href="styles.css"></head>
+<body><main>
+<header><h1>계산중이쥐</h1><p class="sub">모바일 상층 보스 · 일격 계산기</p><div class="hint" id="topCloudStatus" role="status">기기 내부 저장</div></header>
+<nav class="tabs" role="tablist" aria-label="화면 선택">
+<button class="tab" data-tab="calc" role="tab" aria-selected="true">계산</button>
+<button class="tab" data-tab="members" role="tab" aria-selected="false">길드원 관리</button>
+<button class="tab" data-tab="data" role="tab" aria-selected="false">데이터 · 도구</button>
+</nav>
+<section id="calcTab" role="tabpanel">
+<div class="card"><div class="pill-group" role="group" aria-label="계산 모드"><button id="bossMode" class="pill active">상층 보스</button><button id="strikeMode" class="pill">일격 점수</button></div>
+<p class="hint">기존 사이트의 보정식(기본 654, 170초, 2배속 손실 4.29%)을 사용합니다.</p>
+<div id="bossControls"><div class="field"><label for="bossHp">보스 총 HP</label><input id="bossHp" type="number" min="1" step="1" inputmode="numeric"></div>
+<div id="bossPresets" class="pill-group" style="margin-top:9px"></div></div>
+<div class="grid" style="margin-top:10px"><div class="field"><label for="speed">배속</label><select id="speed"><option value="1">1배속</option><option value="2">2배속 (-4.29%)</option></select></div>
+<div class="field"><label for="serverBonus">서버 격추값 (%)</label><input id="serverBonus" type="number" min="0" step="0.01" inputmode="decimal"></div></div>
+<div id="regionControls" hidden style="margin-top:10px"><div class="field"><label for="region">지역</label><select id="region"><option value="pirate">해적</option><option value="cat">고양이</option><option value="wolf">늑대</option><option value="food">음식</option></select></div></div>
+</div>
+<div class="card"><div class="section-heading"><h2>참여 인원 <span id="activeCount" class="gold"></span></h2><button id="manageJump" class="secondary small">길드원 추가·수정</button></div>
+<div id="memberToggles" class="pill-group"></div>
+<div id="autoActions" class="actions"><button class="secondary" id="equalRatio">비율 균등 배분</button><button class="secondary" id="bonusRatio">격추 비례 배분</button><button class="primary" id="equalTime">시간 맞추기</button></div>
+<div id="emptyCalc" class="msg" hidden>참여할 길드원을 선택하면 계산 결과가 나옵니다.</div></div>
+<div id="calcMemberCards"></div>
+<div class="card"><h2>전체 계산 결과</h2><div class="grid"><div class="stat"><div class="stat-name" id="sumName">총 예상 HP</div><div class="stat-value" id="sumValue">0</div></div><div class="stat"><div class="stat-name" id="ratioName">실제 HP 비율</div><div class="stat-value" id="ratioValue">0%</div></div><div class="stat"><div class="stat-name">평균 소요 시간</div><div class="stat-value" id="averageTime">0초</div></div><div class="stat"><div class="stat-name">참여 인원</div><div class="stat-value" id="sumMembers">0명</div></div></div>
+<div id="calcWarnings" aria-live="polite"></div>
+<div class="actions"><button id="copySummary" class="primary">결과 복사</button></div></div>
+</section>
+<section id="membersTab" role="tabpanel" hidden>
+<div class="card"><h2>길드원 추가</h2><div class="grid"><div class="field"><label for="newName">닉네임</label><input id="newName" type="text" maxlength="30" placeholder="새 길드원 이름"></div><div class="field"><label for="newBonus">기본 격추값 (%)</label><input id="newBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"></div></div><button id="addMember" class="primary" style="margin-top:10px;width:100%">길드원 추가하기</button><p class="hint">길드원 수는 15명으로 제한하지 않습니다. 삭제 시 해당 길드원의 저장값도 제거됩니다.</p></div>
+<div class="card"><div class="section-heading"><h2>길드원 목록</h2><span id="totalMembers" class="small muted"></span></div><div id="manageMembers"></div></div>
+</section>
+<section id="dataTab" role="tabpanel" hidden>
+<div class="card"><div class="section-heading"><h2>공용 길드원 데이터 연결</h2><span class="small muted" id="cloudStatus">기기 내부 저장</span></div>
+<p class="note">길드원 닉네임·기본 격추·최소 점수·지역별 격추를 모든 연결된 기기에서 공유합니다. 참여 인원·배속·보스 계산 조건은 각 기기에 개별 저장됩니다.</p>
+<div class="field"><label for="cloudUrl">공용 서버 주소 (Cloudflare Worker)</label><input type="url" id="cloudUrl" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://your-guild.your-account.workers.dev"></div>
+<div class="grid" style="margin-top:10px"><div class="field"><label for="cloudReadKey">공용 읽기 키 (필수)</label><input id="cloudReadKey" type="password" autocomplete="off" placeholder="읽기용 비밀 키"></div>
+<div class="field"><label for="cloudEditKey">관리자 수정 키 (편집할 기기만)</label><input id="cloudEditKey" type="password" autocomplete="off" placeholder="없으면 읽기 전용"></div></div>
+<div class="actions"><button id="connectShared" class="primary">설정 저장 · 서버 연결</button><button id="refreshShared" class="secondary">지금 동기화</button><button id="disconnectShared" class="danger">연결 해제</button></div>
+<div class="hint" id="cloudDetails">공용 연결 설정을 입력하고 연결하세요.</div>
+<p class="hint">보안: 읽기 키를 가진 사람은 길드원 정보를 열람하고, 수정 키를 가진 사람은 길드원을 추가·삭제·수정할 수 있습니다. 키는 이 기기에 저장됩니다. 서버가 없거나 인터넷이 끊기면 마지막 데이터로 계산하지만 공용 수정은 제한됩니다.</p>
+</div>
+<div class="card"><h2>남은 시간 계산기</h2><div class="grid"><div class="field"><label for="remainingMin">현재 남은 시간 (분)</label><input id="remainingMin" type="number" min="0" value="0"></div><div class="field"><label for="remainingSec">현재 남은 시간 (초)</label><input id="remainingSec" type="number" min="0" value="0"></div><div class="field"><label for="targetMin">목표 시간 (분)</label><input id="targetMin" type="number" min="0" value="0"></div><div class="field"><label for="targetSec">목표 시간 (초)</label><input id="targetSec" type="number" min="0" value="0"></div></div><div id="remainingOutput" class="result-block"></div></div>
+<div class="card"><h2>데이터 백업 · 복원</h2><p class="note">이 기기의 계산 설정과 마지막 길드원 데이터가 백업됩니다. 공용 모드에서 복원은 제한되며, 서버 데이터는 이 백업으로 덮어쓰지 않습니다.</p><div class="actions"><button id="exportButton" class="primary">JSON 백업 저장</button><button id="showBackup" class="secondary">백업 텍스트 보기</button></div><div id="backupArea" hidden><label for="backupText" class="hint">복사용 백업 데이터</label><textarea id="backupText" readonly></textarea></div><hr class="sep"><label for="importFile" class="hint">JSON 백업 불러오기</label><input id="importFile" type="file" accept="application/json,.json"><p class="hint">복원하면 현재 데이터가 교체됩니다.</p></div>
+<div class="card"><h2>안내</h2><p class="note">이 앱은 원본 공개 계산식을 참조해 별도로 작성한 모바일 버전입니다. 상층 모드에서는 기본 격추값과 서버 격추값만, 일격 모드에서는 선택한 지역의 격추값도 합산합니다.</p><button id="resetButton" class="danger">기본 길드원으로 초기화</button></div>
+</section>
+</main><div id="toast" class="status" role="status" hidden></div>
+<script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));</script><script src="calc.js"></script><script src="shared.js"></script><script src="app.js"></script></body></html>
