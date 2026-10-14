@@ -453,3 +453,126 @@ button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.48;cur
 }
 @media(max-width:360px){.music-toggle #musicText{display:none}.music-controls{gap:4px}.music-volume{width:55px}}
 @media print{.music-controls{display:none!important}}
+
+/* Zone 2 — guild battle dashboard. Scoped to the upper-tower calculation view. */
+#zoneTwoPanel{--z2-panel:rgba(33,14,54,.76);--z2-stroke:rgba(235,193,255,.24);--z2-gold:#ffe3a4;--z2-lilac:#eacbff;color:#fff6ff;padding-bottom:14px}
+#zoneTwoPanel .z2-hero{position:relative;display:flex;align-items:center;min-height:186px;padding:22px 22px 20px;margin:13px 0 14px;border-radius:22px;isolation:isolate;overflow:hidden;background:radial-gradient(circle at 80% 30%,rgba(228,151,252,.20),transparent 49%),linear-gradient(120deg,rgba(53,22,81,.95),rgba(28,13,48,.92));border:1px solid rgba(255,216,156,.4);box-shadow:0 16px 40px #0006,inset 0 1px 0 #fff2}
+#zoneTwoPanel .z2-hero::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(135deg,transparent 0 30px,#fff1 30px 31px,transparent 31px 60px);opacity:.23;z-index:-1}
+#zoneTwoPanel .z2-hero::after{content:'';position:absolute;left:16px;right:16px;bottom:7px;height:1px;background:linear-gradient(90deg,transparent,#ffe4ad77,transparent)}
+#zoneTwoPanel .z2-hero-copy{position:relative;z-index:2;max-width:75%;min-width:0}
+#zoneTwoPanel .z2-eyebrow{font-size:10px;font-weight:800;letter-spacing:.18em;color:#dfbcf5}
+#zoneTwoPanel .z2-hero h2{font-size:clamp(27px,5vw,36px);color:#ffdea2;margin:8px 0;line-height:1.15;text-shadow:0 2px 16px #a96eff33}
+#zoneTwoPanel .z2-hero p{margin:0;font-size:13px;line-height:1.6;color:#e7d4f6;max-width:360px}
+#zoneTwoPanel .z2-hero-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:15px}
+#zoneTwoPanel .z2-hero-tags span{font-weight:700;font-size:11px;border-radius:100px;background:#bd77d82c;border:1px solid #debafa66;color:#fde6ff;padding:4px 11px}
+#zoneTwoPanel .z2-hero-mascot{position:absolute;right:18px;bottom:18px;width:clamp(90px,24vw,132px);height:120px;object-fit:contain;filter:drop-shadow(0 8px 18px #1f093b);opacity:.95}
+#zoneTwoPanel .z2-hero-star{position:absolute;color:#ffeab6;text-shadow:0 0 15px #ffcb73aa;pointer-events:none}
+#zoneTwoPanel .z2-star-one{right:25px;top:14px;font-size:24px}
+#zoneTwoPanel .z2-star-two{right:142px;bottom:27px;font-size:20px}
+#zoneTwoPanel .z2-card{background:linear-gradient(135deg,rgba(44,20,68,.77),rgba(25,12,43,.79));border:1px solid var(--z2-stroke);box-shadow:0 16px 35px rgba(0,0,0,.22);padding:17px;border-radius:19px;margin:13px 0}
+#zoneTwoPanel .z2-section-heading{display:flex;align-items:center;gap:10px;margin:0 0 16px;min-width:0}
+#zoneTwoPanel .z2-section-heading>div{flex:1;min-width:0}
+#zoneTwoPanel .z2-section-heading h2{margin:0 0 2px;color:#ffe4a9;font-size:18px;line-height:1.25}
+#zoneTwoPanel .z2-section-heading p{font-size:11.5px;color:#d6c1e7;margin:0;line-height:1.5}
+#zoneTwoPanel .z2-step{flex:0 0 34px;display:grid;place-items:center;height:34px;border-radius:11px;font-size:12px;font-weight:900;color:#fbe3b4;background:linear-gradient(140deg,#9b50bd55,#5b2b8455);border:1px solid #eac1fc44;box-shadow:inset 0 1px 0 #fff2}
+#zoneTwoPanel .z2-boss-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+#zoneTwoPanel .z2-boss-choice{min-width:0;min-height:115px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:15px;background:linear-gradient(150deg,rgba(69,34,101,.57),rgba(38,21,63,.46));border:1px solid rgba(226,185,255,.25);color:#ecd7f8;box-shadow:inset 0 1px 0 #fff1,0 7px 15px #0003;padding:11px 5px;transition:transform .15s,border-color .15s,background .15s}
+#zoneTwoPanel .z2-boss-choice.active{border-color:#ffe2a0;box-shadow:inset 0 0 0 1px #f8d99766,0 0 22px #e3a85922;background:linear-gradient(150deg,rgba(128,66,156,.74),rgba(72,38,97,.65))}
+#zoneTwoPanel .z2-boss-choice:active{transform:scale(.98)}
+#zoneTwoPanel .z2-boss-symbol{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 30% 20%,#d88bfa99,#73359a88 75%);color:#ffe1a7;font-size:25px;border:1px solid #f4bdf755;box-shadow:0 4px 15px #be57df33}
+#zoneTwoPanel .z2-boss-choice.active .z2-boss-symbol{background:radial-gradient(circle at 30% 20%,#ffe2accc,#a864dba8 80%);box-shadow:0 0 16px #ffd28a66}
+#zoneTwoPanel .z2-boss-name{font-weight:800;color:#f8e9ff;font-size:14px;white-space:nowrap}
+#zoneTwoPanel .z2-boss-caption{font-size:9px;letter-spacing:.04em;color:#c9abd9}
+#zoneTwoPanel .z2-hp-field{display:flex;align-items:end;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px;padding:14px 15px 10px;background:rgba(15,7,29,.42);border:1px solid #d3aad32a;border-radius:13px}
+#zoneTwoPanel .z2-hp-field .field{flex:1;min-width:175px}
+#zoneTwoPanel .field label{color:#e8d1f6;font-size:12px}
+#zoneTwoPanel .z2-hp-field input{font-size:21px;font-weight:800;letter-spacing:.015em;color:#fff0ca}
+#zoneTwoPanel .z2-hp-suffix{font-size:10px;color:#cdb4dc;padding-bottom:15px}
+#zoneTwoPanel input:not([type=checkbox]),#zoneTwoPanel select{border:1px solid #dabaf43b;background:rgba(18,7,33,.6);box-shadow:inset 0 1px 0 #fff1;border-radius:11px;min-height:46px}
+#zoneTwoPanel input:focus,#zoneTwoPanel select:focus{border-color:#ffe0a0}
+#zoneTwoPanel .z2-conditions-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:12px}
+#zoneTwoPanel .z2-speed-buttons{display:flex;gap:8px;margin-top:4px}
+#zoneTwoPanel .z2-speed-choice{flex:1;min-height:69px;border-radius:12px;border:1px solid #d9b8f044;background:rgba(20,9,36,.56);color:#e6d2ef;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:7px;transition:background .15s,box-shadow .15s}
+#zoneTwoPanel .z2-speed-choice strong{font-size:21px;color:#e9d5f5;line-height:1.1}
+#zoneTwoPanel .z2-speed-choice small{font-size:10px}
+#zoneTwoPanel .z2-speed-choice.active{border-color:#ffd99c;background:linear-gradient(125deg,rgba(150,90,187,.68),rgba(90,44,110,.63));box-shadow:inset 0 0 0 1px #fcdba638,0 0 18px #bb6bf02b}
+#zoneTwoPanel .z2-speed-choice.active strong{color:#ffe8b5}
+#zoneTwoPanel select.z2-hidden-select{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;min-height:0!important;padding:0!important;border:0!important}
+#zoneTwoPanel .z2-bonus-field .z2-input-suffix{margin-top:4px}
+#zoneTwoPanel .z2-input-suffix{display:flex;align-items:center;position:relative}
+#zoneTwoPanel .z2-input-suffix input{padding-right:28px;width:100%}
+#zoneTwoPanel .z2-input-suffix span{position:absolute;right:11px;color:#d0b2e4;font-size:13px;pointer-events:none}
+#zoneTwoPanel .z2-small-note{font-size:10px;color:#c6acd8;margin:4px 0 0;line-height:1.35}
+#zoneTwoPanel .z2-roster-heading{flex-wrap:wrap}
+#zoneTwoPanel .z2-count{color:#d4a4f3;font-weight:650;font-size:13px}
+#zoneTwoPanel .z2-manage-jump{min-height:37px!important;padding:7px 11px!important;font-size:11px;white-space:nowrap}
+#zoneTwoPanel .z2-filter-row{display:flex;gap:6px;overflow-x:auto;margin:0 -3px 12px;padding:2px 3px 7px;scrollbar-width:thin}
+#zoneTwoPanel .z2-filter{white-space:nowrap;min-height:36px;min-width:54px;padding:6px 12px;border-radius:11px;border:1px solid #bb90db47;background:#3b1e5570;color:#ddc9e9;font-size:12px;font-weight:750}
+#zoneTwoPanel .z2-filter.active{background:#ffdc9fda;border-color:#ffe6b8;color:#352044}
+#zoneTwoPanel .z2-roster-controls{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+#zoneTwoPanel .z2-search{position:relative;flex:1 1 170px;min-width:0}
+#zoneTwoPanel .z2-search input{width:100%;font-size:13px;padding-left:29px}
+#zoneTwoPanel .z2-search span{position:absolute;left:10px;top:8px;color:#e6bff8;font-size:20px;z-index:1}
+#zoneTwoPanel .z2-roster-controls button{font-size:11px;min-height:43px;padding:7px 10px}
+#zoneTwoPanel .z2-member-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#zoneTwoPanel .z2-member-toggle{display:flex;align-items:center;min-width:0;min-height:62px;text-align:left;gap:9px;background:rgba(19,9,32,.49);border:1px solid rgba(231,190,248,.19);border-radius:12px;padding:8px;color:#f6e7ff}
+#zoneTwoPanel .z2-member-toggle.active{background:linear-gradient(115deg,rgba(101,48,125,.78),rgba(66,32,96,.53));border-color:rgba(255,218,148,.72);box-shadow:inset 0 0 0 1px #ffda9555}
+#zoneTwoPanel .z2-member-avatar,#zoneTwoPanel .z2-player-avatar{display:grid;place-items:center;flex:none;width:37px;height:37px;border-radius:12px;background:linear-gradient(140deg,#b879d57f,#632f7c82);border:1px solid #e8c4f566;color:#fff0cc;font-size:17px;font-weight:900}
+#zoneTwoPanel .z2-member-info{display:flex;min-width:0;flex:1;flex-direction:column;gap:2px}
+#zoneTwoPanel .z2-member-info strong{font-size:13px;line-height:1.3;overflow-wrap:anywhere}
+#zoneTwoPanel .z2-member-info small{color:#cdb9dc;font-size:10px}
+#zoneTwoPanel .z2-member-check{flex:none;display:grid;place-items:center;width:23px;height:23px;border:1px solid #c397df77;border-radius:8px;color:#debbf2;font-size:14px}
+#zoneTwoPanel .z2-member-toggle.active .z2-member-check{background:#f7d698;color:#482f54;border-color:#f7d698;font-weight:900}
+#zoneTwoPanel .z2-roster-empty{font-size:12px;color:#d7c1e7;padding:18px 10px;text-align:center}
+#zoneTwoPanel .z2-empty{display:flex;align-items:center;justify-content:center;gap:12px;margin:15px 0;padding:11px;background:#2d16477a;border-radius:13px;border:1px dashed #d4a9e866}
+#zoneTwoPanel .z2-empty img{width:62px;height:62px;object-fit:contain}
+#zoneTwoPanel .z2-empty p{font-size:13px;color:#f1d9ff;margin:0;line-height:1.6}
+#zoneTwoPanel .z2-empty small{font-size:11px;color:#c6abd8}
+#zoneTwoPanel .z2-auto-actions{margin-top:15px;padding-top:12px;border-top:1px solid #f1d3fa29}
+#zoneTwoPanel .z2-auto-label{margin:0 0 9px;color:#f2d0f6;font-size:12px;font-weight:800}
+#zoneTwoPanel .z2-auto-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#zoneTwoPanel .z2-auto-buttons button{padding:9px 5px;font-size:12px;min-height:45px}
+#zoneTwoPanel .z2-players-section{margin:20px 0 14px}
+#zoneTwoPanel .z2-outside-heading{margin:0 4px 10px}
+#zoneTwoPanel .z2-player-list{display:grid;grid-template-columns:repeat(1,minmax(0,1fr));gap:10px}
+#zoneTwoPanel .z2-player-card{margin:0;min-width:0;padding:14px;background:linear-gradient(135deg,rgba(50,23,74,.80),rgba(27,13,43,.86));border-color:#c79ee344}
+#zoneTwoPanel .z2-player-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+#zoneTwoPanel .z2-player-identity{display:flex;align-items:center;gap:10px;min-width:0}
+#zoneTwoPanel .z2-player-avatar{width:43px;height:43px;font-size:20px;border-radius:14px}
+#zoneTwoPanel .z2-player-identity h3{font-size:16px;line-height:1.2;color:#fff4da;margin:0 0 5px;overflow-wrap:anywhere}
+#zoneTwoPanel .z2-player-badge{display:inline-block;font-size:10px;border:1px solid #b998d555;background:#c69ced22;color:#e9c7fd;padding:2px 7px;border-radius:100px}
+#zoneTwoPanel .z2-player-number{font-size:11px;font-weight:800;color:#c4a0d9;letter-spacing:.15em}
+#zoneTwoPanel .z2-player-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:11px}
+#zoneTwoPanel .z2-player-fields .field{min-width:0}
+#zoneTwoPanel .z2-player-fields input,#zoneTwoPanel .z2-player-fields select{padding:9px 9px;font-size:13px}
+#zoneTwoPanel .z2-player-result{padding:12px;border:1px solid #b68ddd35;border-radius:12px;background:rgba(18,8,32,.50)}
+#zoneTwoPanel .z2-result-numbers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#zoneTwoPanel .z2-result-numbers>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+#zoneTwoPanel .z2-result-numbers small{font-size:10px;color:#cbb7db}
+#zoneTwoPanel .z2-result-numbers strong{font-size:clamp(12px,2.8vw,19px);color:#ffdf9d;overflow-wrap:anywhere;line-height:1.3}
+#zoneTwoPanel .z2-member-progress,#zoneTwoPanel .z2-progress-track{height:7px;border-radius:100px;background:#1b0b2bd9;overflow:hidden;border:1px solid #b283d731;margin-top:12px}
+#zoneTwoPanel .z2-member-progress span{display:block;height:100%;background:linear-gradient(90deg,#9c68c9,#ffd18a);border-radius:inherit;transition:width .18s}
+#zoneTwoPanel .z2-result-foot{text-align:right;font-size:10px;color:#bfa8d3;margin-top:5px}
+#zoneTwoPanel .z2-player-minscore{font-size:10px;color:#c4afd4;margin:7px 3px 0}
+#zoneTwoPanel .z2-progress-overview{background:radial-gradient(circle at 100% 0%,#b57ade29,transparent 60%),rgba(14,7,28,.62);padding:15px;border:1px solid #d5abe944;border-radius:15px;margin-bottom:11px}
+#zoneTwoPanel .z2-progress-titles{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#zoneTwoPanel .z2-progress-titles span{font-size:12px;color:#e0c6ef}
+#zoneTwoPanel .z2-progress-titles strong{font-size:24px;color:#ffe1a2;font-weight:900}
+#zoneTwoPanel .z2-progress-track{height:12px;margin-top:10px;border-color:#ead3ef3c}
+#zoneTwoPanel #z2ProgressFill{height:100%;width:0%;border-radius:inherit;background:linear-gradient(90deg,#985dc8 0%,#e49de6 55%,#ffd991 100%);box-shadow:0 0 14px #bd75e888;transition:width .2s ease}
+#zoneTwoPanel .z2-progress-detail{margin:8px 0 0;color:#d7bcde;font-size:11px}
+#zoneTwoPanel .z2-stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#zoneTwoPanel .z2-stat{padding:12px;border:1px solid #dfbdfa2c;border-radius:12px;background:#130b2480;min-width:0}
+#zoneTwoPanel .z2-stat span{display:block;margin-bottom:6px}
+#zoneTwoPanel .z2-stat strong{font-size:clamp(16px,3.3vw,21px);color:#fff3d8}
+#zoneTwoPanel .z2-copy-button{display:block;width:100%;min-height:48px;margin-top:15px;font-size:14px;background:linear-gradient(110deg,#ffe5a844,#9f5ebf77);border-color:#ffdc9b88;color:#fff1cc;box-shadow:0 0 20px #b571e533}
+@media(min-width:700px){#zoneTwoPanel .z2-player-list{grid-template-columns:repeat(2,minmax(0,1fr))}#zoneTwoPanel .z2-player-fields{grid-template-columns:repeat(2,minmax(0,1fr))}#zoneTwoPanel .z2-result-numbers strong{font-size:16px}}
+@media(max-width:460px){#zoneTwoPanel .z2-hero{min-height:188px;padding:18px 15px}#zoneTwoPanel .z2-hero-copy{max-width:65%}#zoneTwoPanel .z2-hero-mascot{right:6px;width:108px;height:115px}#zoneTwoPanel .z2-card{padding:13px}#zoneTwoPanel .z2-boss-grid{gap:6px}#zoneTwoPanel .z2-boss-choice{min-height:106px;padding:8px 2px}#zoneTwoPanel .z2-boss-symbol{width:37px;height:37px;font-size:21px}#zoneTwoPanel .z2-boss-name{font-size:12px}#zoneTwoPanel .z2-boss-caption{font-size:8px}#zoneTwoPanel .z2-member-grid{grid-template-columns:1fr}#zoneTwoPanel .z2-roster-controls button{flex:1 1 auto}#zoneTwoPanel .z2-search{flex-basis:100%}#zoneTwoPanel .z2-section-heading p{font-size:11px}#zoneTwoPanel .z2-step{flex-basis:30px;height:30px}#zoneTwoPanel .z2-player-fields{grid-template-columns:repeat(2,minmax(0,1fr))}#zoneTwoPanel .z2-result-numbers strong{font-size:13px}}
+@media(max-width:355px){#zoneTwoPanel .z2-hero-mascot{width:79px}#zoneTwoPanel .z2-hero-copy{max-width:62%}#zoneTwoPanel .z2-hero h2{font-size:25px}#zoneTwoPanel .z2-conditions-grid{grid-template-columns:1fr}#zoneTwoPanel .z2-boss-caption{display:none}#zoneTwoPanel .z2-auto-buttons button{font-size:11px;padding:8px 3px}#zoneTwoPanel .z2-result-numbers strong{font-size:12px}}
+@media(prefers-reduced-motion:reduce){#zoneTwoPanel .z2-boss-choice,#zoneTwoPanel .z2-member-progress span,#zoneTwoPanel #z2ProgressFill{transition:none}}
+
+/* Independent per-zone knockout bonuses. */
+#zoneTwoPanel .z2-bonus-breakdown{font-size:11px;color:#e2c7f0;margin:10px 0 2px;line-height:1.5;overflow-wrap:anywhere}
+.zone-bonus-grid{padding:9px;border:1px solid rgba(255,213,160,.17);border-radius:11px;background:rgba(79,44,101,.15)}
+.zone-bonus-grid .field label{color:#ffdea5}
+.zone-member-info .zone-bonus-note{display:block;font-size:10px;color:#e5c6f6;margin-top:2px}

@@ -1,0 +1,16 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root=path.join(__dirname, '..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const css=fs.readFileSync(path.join(root,'styles.css'),'utf8');
+const js=fs.readFileSync(path.join(root,'app.js'),'utf8');
+const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
+assert.equal(new Set(ids).size, ids.length, 'HTML duplicate IDs');
+const required=['zoneTwoPanel','z2HeroTitle','z2BossPanel','bossControls','bossPresets','bossHp','speed','serverBonus','z2MemberSearch','z2SelectShown','z2ClearActive','memberToggles','calcMemberCards','sumValue','ratioValue','averageTime','z2ProgressFill','copySummary'];
+for(const id of required) assert.ok(ids.includes(id), `Missing #${id}`);
+for(const str of ['data-z2-filter="1"','data-z2-filter="4"','data-z2-filter="0"','data-z2-speed="1"','data-z2-speed="2"']) assert.ok(html.includes(str),`Missing ${str}`);
+for(const str of ['function renderZ2Roster()', 'function z2MemberVisible(', 'function renderZ2Speed()', 'C.calculateBoss(', 'C.calculateStrike(']) assert.ok(js.includes(str),`Missing ${str}`);
+for(const str of ['.z2-boss-choice','.z2-player-card','.z2-progress-track','@media(max-width:355px)']) assert.ok(css.includes(str),`Missing style ${str}`);
+console.log('PASS: zone2 dashboard IDs, actions, calculation binding, responsive CSS');

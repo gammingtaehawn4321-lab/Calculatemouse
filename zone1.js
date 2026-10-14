@@ -16,7 +16,7 @@
     const factor=speed===2?0.9571:1;
     const people=entries.map(m=>{
       const raw=FINITE(m.raw,0,100);
-      const bonus=FINITE(m.bonus,0,1000000);
+      const bonus=FINITE(m.bonus,0,1000000)+FINITE(m.zone1Bonus,0,1000000);
       const knocks=Math.floor(FINITE(m.knocks,0,100));
       const adjusted=mode==='final'?raw:raw*(1+(bonus+serverBonus)/100)*factor*Math.pow(1-lossPerKnock/100,knocks);
       return {id:String(m.id),name:String(m.name),group:Number(m.group)||0,raw,knocks,bonus,effective:adjusted};

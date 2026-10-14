@@ -41,6 +41,7 @@
 <div class="field"><label for="zoneOneSpeed">배속</label><select id="zoneOneSpeed"><option value="1">1배속</option><option value="2">2배속 (4.29% 손실)</option></select></div>
 <div class="field"><label for="zoneOneServerBonus">서버 격추 보너스 (%)</label><input id="zoneOneServerBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"></div>
 <div class="field"><label for="zoneOneKnockLoss">격추 1회당 점수 손실 (%)</label><input id="zoneOneKnockLoss" type="number" value="0" min="0" max="100" step="0.01" inputmode="decimal"></div></div>
+<p class="hint">길드원별 상층 1구역 추가 격추는 기본 격추에 더해집니다. 상층 2구역 추가 격추는 적용되지 않습니다.</p>
 <p class="hint">최종 %를 입력했다면 손실·격추 보너스를 중복 적용하지 않습니다. 보정 전 %를 입력할 때만 설정한 보너스·배속·격추 손실을 반영합니다. 격추 1회당 손실률은 실제 게임값으로 직접 설정하세요.</p>
 </div>
 <div class="card"><div class="section-heading"><h2>길드원 참여 기여도</h2><button class="secondary small" data-open-tab="members">군 편성</button></div>
@@ -55,33 +56,85 @@
 <button id="drawZoneOne" class="primary full-width">군별 분배 및 2차 추첨 실행</button>
 <div id="zoneOneResults" aria-live="polite"></div></div>
 </section>
-<div id="zoneTwoPanel" hidden>
+<div id="zoneTwoPanel" class="z2-screen" hidden>
+  <section class="z2-hero" aria-label="상층 2구역 안내">
+    <div class="z2-hero-copy">
+      <span class="z2-eyebrow">TOWER · STAGE 02</span>
+      <h2 id="z2HeroTitle">상층 2구역</h2>
+      <p id="z2HeroDesc">길드원의 격추값과 전투 시간을 계산해 최적의 공략 분담을 맞춰 보세요.</p>
+      <div class="z2-hero-tags"><span id="z2HeroBoss">바나냥</span><span id="z2HeroSpeed">2배속</span></div>
+    </div>
+    <img class="z2-hero-mascot" src="assets/note-hamster.png" alt="" loading="lazy">
+    <span class="z2-hero-star z2-star-one" aria-hidden="true">✦</span><span class="z2-hero-star z2-star-two" aria-hidden="true">✧</span>
+  </section>
 
-<div class="card"><div class="pill-group" role="group" aria-label="계산 모드" hidden><button id="bossMode" class="pill active">상층 보스</button><button id="strikeMode" class="pill">일격 점수</button></div>
+  <section class="card z2-card z2-boss-section" id="z2BossPanel" aria-labelledby="z2BossHeading">
+    <div class="z2-section-heading"><span class="z2-step">01</span><div><h2 id="z2BossHeading">공략 보스</h2><p>보스를 선택하면 체력이 자동으로 입력돼요.</p></div></div>
+    <div class="pill-group" role="group" aria-label="계산 모드" hidden><button id="bossMode" class="pill active" type="button">상층 보스</button><button id="strikeMode" class="pill" type="button">일격 점수</button></div>
+    <div id="bossControls">
+      <div id="bossPresets" class="z2-boss-grid" role="group" aria-label="상층 보스 선택"></div>
+      <div class="z2-hp-field"><div class="field"><label for="bossHp">목표 보스 HP</label><input id="bossHp" type="number" min="1" step="1" inputmode="numeric" aria-describedby="z2HpHelp"></div><span id="z2HpHelp" class="z2-hp-suffix">HP · 직접 수정 가능</span></div>
+    </div>
+  </section>
 
-<div id="bossControls"><div class="field"><label for="bossHp">보스 총 HP</label><input id="bossHp" type="number" min="1" step="1" inputmode="numeric"></div>
-<div id="bossPresets" class="pill-group" style="margin-top:9px"></div></div>
-<div class="grid" style="margin-top:10px"><div class="field"><label for="speed">배속</label><select id="speed"><option value="1">1배속</option><option value="2">2배속 (-4.29%)</option></select></div>
-<div class="field"><label for="serverBonus">서버 격추값 (%)</label><input id="serverBonus" type="number" min="0" step="0.01" inputmode="decimal"></div></div>
-<div id="regionControls" hidden style="margin-top:10px"><div class="field"><label for="region">지역</label><select id="region"><option value="pirate">해적</option><option value="cat">고양이</option><option value="wolf">늑대</option><option value="food">음식</option></select></div></div>
-</div>
-<div class="card"><div class="section-heading"><h2>참여 인원 <span id="activeCount" class="gold"></span></h2><button id="manageJump" class="secondary small">길드원 추가·수정</button></div>
-<div id="memberToggles" class="pill-group"></div>
-<div id="autoActions" class="actions"><button class="secondary" id="equalRatio">비율 균등 배분</button><button class="secondary" id="bonusRatio">격추 비례 배분</button><button class="primary" id="equalTime">시간 맞추기</button></div>
-<div id="emptyCalc" class="msg" hidden>등록된 길드원이 없다면 길드원 관리에서 추가하세요. 참여할 길드원을 선택하면 계산 결과가 나옵니다.</div></div>
-<div id="calcMemberCards"></div>
-<div class="card"><h2>전체 계산 결과</h2><div class="grid"><div class="stat"><div class="stat-name" id="sumName">총 예상 HP</div><div class="stat-value" id="sumValue">0</div></div><div class="stat"><div class="stat-name" id="ratioName">실제 HP 비율</div><div class="stat-value" id="ratioValue">0%</div></div><div class="stat"><div class="stat-name">평균 소요 시간</div><div class="stat-value" id="averageTime">0초</div></div><div class="stat"><div class="stat-name">참여 인원</div><div class="stat-value" id="sumMembers">0명</div></div></div>
-<div id="calcWarnings" aria-live="polite"></div>
-<div class="actions"><button id="copySummary" class="primary">결과 복사</button></div></div>
+  <section class="card z2-card z2-settings-section" aria-labelledby="z2SettingsHeading">
+    <div class="z2-section-heading"><span class="z2-step">02</span><div><h2 id="z2SettingsHeading">전투 조건</h2><p>배속과 격추 보너스를 설정하세요.</p></div></div>
+    <div class="z2-conditions-grid">
+      <div class="field z2-speed-field">
+        <label id="z2SpeedLabel">전투 배속</label>
+        <div class="z2-speed-buttons" role="group" aria-labelledby="z2SpeedLabel">
+          <button class="z2-speed-choice" type="button" data-z2-speed="1" aria-pressed="false"><strong>×1</strong><small>기본 배속</small></button>
+          <button class="z2-speed-choice" type="button" data-z2-speed="2" aria-pressed="true"><strong>×2</strong><small>점수 −4.29%</small></button>
+        </div>
+        <select id="speed" class="z2-hidden-select" aria-hidden="true" tabindex="-1"><option value="1">1배속</option><option value="2">2배속 (-4.29%)</option></select>
+      </div>
+      <div class="field z2-bonus-field"><label for="serverBonus">서버 격추값 (%)</label><div class="z2-input-suffix"><input id="serverBonus" type="number" min="0" step="0.01" inputmode="decimal"><span>%</span></div><p class="z2-small-note">개인 기본 격추 + 상층 2구역 추가 격추 + 서버 격추를 적용합니다.</p></div>
+    </div>
+    <div id="regionControls" hidden style="margin-top:12px"><div class="field"><label for="region">지역</label><select id="region"><option value="pirate">해적</option><option value="cat">고양이</option><option value="wolf">늑대</option><option value="food">음식</option></select></div></div>
+  </section>
+
+  <section class="card z2-card z2-roster-section" aria-labelledby="z2RosterHeading">
+    <div class="z2-section-heading z2-roster-heading"><span class="z2-step">03</span><div><h2 id="z2RosterHeading">참여 길드원 <span id="activeCount" class="z2-count">(0/0)</span></h2><p>이번 공략에 참여할 길드원을 선택하세요.</p></div><button id="manageJump" class="secondary small z2-manage-jump" type="button">+ 길드원 관리</button></div>
+    <div class="z2-filter-row" role="group" aria-label="군별 길드원 표시">
+      <button type="button" class="z2-filter active" data-z2-filter="all" aria-pressed="true">전체</button>
+      <button type="button" class="z2-filter" data-z2-filter="1" aria-pressed="false">1군</button>
+      <button type="button" class="z2-filter" data-z2-filter="2" aria-pressed="false">2군</button>
+      <button type="button" class="z2-filter" data-z2-filter="3" aria-pressed="false">3군</button>
+      <button type="button" class="z2-filter" data-z2-filter="4" aria-pressed="false">4군</button>
+      <button type="button" class="z2-filter" data-z2-filter="0" aria-pressed="false">미지정</button>
+    </div>
+    <div class="z2-roster-controls">
+      <label class="z2-search"><span aria-hidden="true">⌕</span><input id="z2MemberSearch" type="search" placeholder="길드원 검색" aria-label="길드원 이름 검색" autocomplete="off"></label>
+      <button id="z2SelectShown" type="button" class="secondary small">표시 인원 전체 선택</button>
+      <button id="z2ClearActive" type="button" class="secondary small">모두 해제</button>
+    </div>
+    <div id="memberToggles" class="z2-member-grid" role="group" aria-label="전투 참여 길드원"></div>
+    <div id="z2RosterEmpty" class="z2-roster-empty" hidden>표시할 길드원이 없어요. 검색이나 군 선택을 바꿔 보세요.</div>
+    <div id="emptyCalc" class="z2-empty" hidden><img src="assets/glass-hamster.png" alt="" loading="lazy"><p>아직 참여 길드원이 없어요.<br><small>위에서 길드원을 선택하거나 새로 등록해 주세요.</small></p></div>
+    <div id="autoActions" class="z2-auto-actions"><p class="z2-auto-label">빠른 배분</p><div class="z2-auto-buttons"><button class="secondary" id="equalRatio" type="button">균등 분배</button><button class="secondary" id="bonusRatio" type="button">격추 비례</button><button class="primary" id="equalTime" type="button">시간 맞추기</button></div></div>
+  </section>
+
+  <section class="z2-players-section" aria-labelledby="z2PlayersHeading">
+    <div class="z2-section-heading z2-outside-heading"><span class="z2-step">04</span><div><h2 id="z2PlayersHeading">개인별 공략 배분</h2><p>담당 비율이나 시간을 변경하면 결과가 바로 계산돼요.</p></div></div>
+    <div id="calcMemberCards" class="z2-player-list"></div>
+  </section>
+
+  <section class="card z2-card z2-summary" aria-labelledby="z2ResultsHeading">
+    <div class="z2-section-heading"><span class="z2-step">05</span><div><h2 id="z2ResultsHeading">전체 계산 결과</h2><p>선택한 인원의 예상 공략량을 한눈에 확인하세요.</p></div></div>
+    <div class="z2-progress-overview"><div class="z2-progress-titles"><span id="z2ProgressLabel">목표 HP 달성률</span><strong id="z2ProgressText">0%</strong></div><div class="z2-progress-track" role="progressbar" id="z2ProgressBar" aria-label="예상 목표 달성률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="z2ProgressFill"></div></div><p class="z2-progress-detail" id="z2ProgressDetail">참여 인원을 선택해 주세요.</p></div>
+    <div class="z2-stats-grid"><div class="z2-stat"><span class="stat-name" id="sumName">총 예상 HP</span><strong class="stat-value" id="sumValue">0</strong></div><div class="z2-stat"><span class="stat-name" id="ratioName">실제 HP 비율</span><strong class="stat-value" id="ratioValue">0%</strong></div><div class="z2-stat"><span class="stat-name">평균 소요 시간</span><strong class="stat-value" id="averageTime">0초</strong></div><div class="z2-stat"><span class="stat-name">참여 인원</span><strong class="stat-value" id="sumMembers">0명</strong></div></div>
+    <div id="calcWarnings" aria-live="polite"></div>
+    <button id="copySummary" class="primary z2-copy-button" type="button">✧ 결과 복사하기</button>
+  </section>
 </div>
 </section>
 <section id="membersTab" role="tabpanel" hidden>
-<div class="card"><h2>길드원 추가</h2><div class="grid"><div class="field"><label for="newName">닉네임</label><input id="newName" type="text" maxlength="30" placeholder="새 길드원 이름"></div><div class="field"><label for="newBonus">기본 격추값 (%)</label><input id="newBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"></div><div class="field"><label for="newGroup">배치할 군</label><select id="newGroup"><option value="0">미지정</option><option value="1">1군</option><option value="2">2군</option><option value="3">3군</option><option value="4">4군</option></select></div></div><button id="addMember" class="primary" style="margin-top:10px;width:100%">길드원 추가하기</button><p class="hint">길드원 수는 15명으로 제한하지 않습니다. 삭제 시 해당 길드원의 저장값도 제거됩니다.</p></div>
+<div class="card"><h2>길드원 추가</h2><div class="grid"><div class="field"><label for="newName">닉네임</label><input id="newName" type="text" maxlength="30" placeholder="새 길드원 이름"></div><div class="field"><label for="newBonus">기본 격추값 (%)</label><input id="newBonus" type="number" value="0" min="0" step="0.01" inputmode="decimal"></div><div class="field"><label for="newZone1Bonus">상층 1구역 추가 격추 (%)</label><input id="newZone1Bonus" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div><div class="field"><label for="newZone2Bonus">상층 2구역 추가 격추 (%)</label><input id="newZone2Bonus" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div><div class="field"><label for="newGroup">배치할 군</label><select id="newGroup"><option value="0">미지정</option><option value="1">1군</option><option value="2">2군</option><option value="3">3군</option><option value="4">4군</option></select></div></div><button id="addMember" class="primary" style="margin-top:10px;width:100%">길드원 추가하기</button><p class="hint">길드원 수는 15명으로 제한하지 않습니다. 삭제 시 해당 길드원의 저장값도 제거됩니다.</p></div>
 <div class="card"><div class="pill-group member-filter" role="group" aria-label="길드원 군별 필터"><button data-filter-group="all" class="pill active">전체</button><button data-filter-group="1" class="pill">1군</button><button data-filter-group="2" class="pill">2군</button><button data-filter-group="3" class="pill">3군</button><button data-filter-group="4" class="pill">4군</button><button data-filter-group="0" class="pill">미지정</button></div><div class="section-heading"><h2>길드원 목록</h2><span id="totalMembers" class="small muted"></span></div><div id="manageMembers"></div></div>
 </section>
 <section id="dataTab" role="tabpanel" hidden>
 <div class="card"><div class="section-heading"><h2>공용 길드원 데이터 연결</h2><span class="small muted" id="cloudStatus">기기 내부 저장</span></div>
-<p class="note">길드원 닉네임·소속 군·기본 격추·최소 점수·지역별 격추를 모든 연결된 기기에서 공유합니다. 참여 인원·배속·보스 계산 조건은 각 기기에 개별 저장됩니다.</p>
+<p class="note">길드원 닉네임·소속 군·기본 격추·상층 1/2구역 추가 격추·최소 점수·지역별 격추를 모든 연결된 기기에서 공유합니다. 참여 인원·배속·보스 계산 조건은 각 기기에 개별 저장됩니다.</p>
 <div class="field"><label for="cloudUrl">공용 서버 주소 (Cloudflare Worker)</label><input type="url" id="cloudUrl" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://your-guild.your-account.workers.dev"></div>
 <div class="grid" style="margin-top:10px"><div class="field"><label for="cloudReadKey">공용 읽기 키 (필수)</label><input id="cloudReadKey" type="password" autocomplete="off" placeholder="읽기용 비밀 키"></div>
 <div class="field"><label for="cloudEditKey">관리자 수정 키 (편집할 기기만)</label><input id="cloudEditKey" type="password" autocomplete="off" placeholder="없으면 읽기 전용"></div></div>

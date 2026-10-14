@@ -1,5 +1,5 @@
 /* GitHub Pages service worker, including offline MP3 range support. */
-const CACHE = 'gyesanjungiji-pwa-v7-loop-bgm';
+const CACHE = 'gyesanjungiji-pwa-v8-zone2-bonuses';
 const ASSETS = [
   './', './index.html', './styles.css', './app.js', './calc.js',
   './shared.js', './music.js', './manifest.webmanifest',

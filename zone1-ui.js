@@ -50,7 +50,7 @@
     $('zoneOneMembers').innerHTML=`<div class="zone-member-list">${people.map(m=>{
       const stored=entries[m.id]||{};
       const group=m.group?`${m.group}군`:'미지정';
-      return `<div class="zone-member" data-zone-member="${esc(m.id)}"><div class="zone-member-info"><strong>${esc(m.name)}</strong><span class="group-badge group-${m.group||0}">${group}</span></div>
+      return `<div class="zone-member" data-zone-member="${esc(m.id)}"><div class="zone-member-info"><strong>${esc(m.name)}</strong><span class="group-badge group-${m.group||0}">${group}</span><span class="zone-bonus-note">1구역 격추 ${pct((m.bonus||0)+(m.zone1Bonus||0))}</span></div>
       <div class="zone-member-fields"><label>기여도 (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-zone-field="raw" data-member-id="${esc(m.id)}" value="${asNumber(stored.raw,100)}"></label>
       <label>격추 횟수<input type="number" min="0" max="100" step="1" inputmode="numeric" data-zone-field="knocks" data-member-id="${esc(m.id)}" value="${Math.floor(asNumber(stored.knocks,100))}"></label></div></div>`;
     }).join('')}</div>`;

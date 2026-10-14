@@ -40,7 +40,7 @@
     return hi;
   }
   function calculateBoss(member, hp, serverBonus, speed) {
-    const bonus = nonnegative(member.bonus) + nonnegative(serverBonus);
+    const bonus = nonnegative(member.bonus) + nonnegative(member.zone2Bonus) + nonnegative(serverBonus);
     const min = nonnegative(member.minScore);
     const mode = member.boss && member.boss.mode === 'time' ? 'time' : 'ratio';
     let seconds, target;
@@ -74,7 +74,7 @@
   function commonBossTime(members, hp, serverBonus, speed) {
     if (members.length === 0) return null;
     const goal = nonnegative(hp);
-    const totalAt = t => members.reduce((sum, m) => sum + totalScore(nonnegative(m.bonus) + nonnegative(serverBonus), t, speed, m.minScore), 0);
+    const totalAt = t => members.reduce((sum, m) => sum + totalScore(nonnegative(m.bonus) + nonnegative(m.zone2Bonus) + nonnegative(serverBonus), t, speed, m.minScore), 0);
     if (totalAt(0) >= goal) return 0;
     let lo = 0, hi = 1;
     while (totalAt(hi) + 1e-7 < goal && hi < MAX_TIME) hi = Math.min(MAX_TIME, hi * 2);
