@@ -1,0 +1,206 @@
+
+name: Unzip and Deploy PWA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - site.zip
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract site.zip
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path, PurePosixPath
+          from tempfile import TemporaryDirectory
+          import shutil
+          import stat
+          import zipfile
+
+          archive = Path('site.zip')
+
+          if not archive.is_file():
+              raise SystemExit('site.zip not found')
+
+          with TemporaryDirectory() as tmp:
+              temp = Path(tmp)
+
+              with zipfile.ZipFile(archive) as z:
+                  for member in z.infolist():
+                      name = member.filename.replace('\\', '/')
+                      parts = PurePosixPath(name).parts
+
+                      if (
+                          not parts
+                          or name.startswith('/')
+                          or '..' in parts
+                      ):
+                          raise SystemExit(
+                              f'Unsafe path: {name}'
+                          )
+
+                      if any(
+                          p in ('.git', '.github')
+                          for p in parts
+                      ):
+                          raise SystemExit(
+                              f'Protected path: {name}'
+                          )
+
+                      mode = member.external_attr >> 16
+
+                      if stat.S_ISLNK(mode):
+                          raise SystemExit(
+                              f'Symlink blocked: {name}'
+                          )
+
+                      dest = temp / name
+
+                      if member.is_dir():
+                          dest.mkdir(
+                              parents=True,
+                              exist_ok=True
+                          )
+                      else:
+                          dest.parent.mkdir(
+                              parents=True,
+                              exist_ok=True
+                          )
+                          with z.open(member) as src:
+                              with dest.open('wb') as dst:
+                                  shutil.copyfileobj(src, dst)
+
+              candidates = list(
+                  temp.rglob('index.html')
+              )
+
+              if len(candidates) != 1:
+                  raise SystemExit(
+                      'Exactly one index.html required'
+                  )
+
+              source = candidates[0].parent
+
+              for item in source.iterdir():
+                  if item.name in (
+                      '.github', '.git', 'site.zip'
+                  ):
+                      continue
+
+                  target = Path.cwd() / item.name
+
+                  if item.is_dir():
+                      shutil.copytree(
+                          item,
+                          target,
+                          dirs_exist_ok=True
+                      )
+                  else:
+                      shutil.copy2(item, target)
+
+          print('Extraction completed')
+
+          PY
+
+      - name: Commit extracted files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update PWA from site.zip"
+            git push
+          else
+            echo "No changes"
+          fi
+
+      - name: Prepare website
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import shutil
+
+          public = Path('_site')
+          public.mkdir(exist_ok=True)
+
+          required = [
+              'index.html',
+              'styles.css',
+              'app.js',
+              'calc.js',
+              'shared.js',
+              'sw.js',
+              'manifest.webmanifest'
+          ]
+
+          optional = [
+              'icon.svg',
+              'icon-192.png',
+              'icon-512.png'
+          ]
+
+          for name in required:
+              if not Path(name).is_file():
+                  raise SystemExit(
+                      f'Missing file: {name}'
+                  )
+              shutil.copy2(
+                  name,
+                  public / name
+              )
+
+          for name in optional:
+              if Path(name).is_file():
+                  shutil.copy2(
+                      name,
+                      public / name
+                  )
+
+          if Path('assets').is_dir():
+              shutil.copytree(
+                  'assets',
+                  public / 'assets',
+                  dirs_exist_ok=True
+              )
+
+          (public / '.nojekyll').touch()
+          PY
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
